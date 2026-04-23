@@ -319,7 +319,21 @@ impl<'a> Lexer<'a> {
             "impl" => Token::Impl,
             "const" => Token::Const,
             "self" => Token::SelfKw,
-            "raw" => Token::Raw,
+            "raw" => {
+                // Contextual keyword: `raw` is only the effect-escape keyword
+                // when immediately followed by `{` (optionally after whitespace).
+                // In any other position it's a plain identifier so that common
+                // names like `let raw = ...` work.
+                let mut i = self.pos;
+                while let Some(&c) = self.src.get(i) {
+                    if c == b' ' || c == b'\t' { i += 1; } else { break; }
+                }
+                if self.src.get(i).copied() == Some(b'{') {
+                    Token::Raw
+                } else {
+                    Token::Ident(s)
+                }
+            }
             "state_machine" => Token::StateMachine,
             "with" => Token::With,
             "trait" => Token::Trait,

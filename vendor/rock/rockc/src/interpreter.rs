@@ -86,6 +86,10 @@ pub struct Interpreter {
     next_task_id: Rc<RefCell<u64>>,
     variant_info: HashMap<String, VariantKind>,
     skip_main: Rc<RefCell<bool>>,
+    /// Paths currently being imported, used to detect circular imports.
+    loading_imports: Rc<RefCell<Vec<std::path::PathBuf>>>,
+    /// Paths already fully imported, to avoid re-executing shared deps.
+    loaded_imports: Rc<RefCell<std::collections::HashSet<std::path::PathBuf>>>,
 }
 
 #[derive(Default, Clone, Copy, Debug)]
@@ -118,6 +122,8 @@ impl Interpreter {
             next_task_id: Rc::new(RefCell::new(0u64)),
             variant_info: HashMap::new(),
             skip_main: Rc::new(RefCell::new(false)),
+            loading_imports: Rc::new(RefCell::new(Vec::new())),
+            loaded_imports: Rc::new(RefCell::new(std::collections::HashSet::new())),
         }
     }
 
@@ -161,6 +167,8 @@ impl Interpreter {
             match &args[0] {
                 Value::Array(a) => Ok(Value::Int(a.borrow().len() as i64)),
                 Value::Str(s) => Ok(Value::Int(s.chars().count() as i64)),
+                Value::Map(m) => Ok(Value::Int(m.borrow().len() as i64)),
+                Value::Nil => Ok(Value::Int(0)),
                 other => Err(RockError::runtime(format!("len() not defined for {}", other.type_name()))),
             }
         });
@@ -214,6 +222,52 @@ impl Interpreter {
             }
         });
         env.borrow_mut().define("float", Value::Native(float_of), false);
+
+        // Safe parsers: return nil on failure instead of panicking. Compose
+        // naturally with the `??` default operator: `parse_int(s) ?? 0`.
+        let parse_int_fn: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(|args: &[Value]| {
+            if args.len() != 1 { return Err(RockError::runtime("parse_int() takes 1 argument")); }
+            match &args[0] {
+                Value::Int(i) => Ok(Value::Int(*i)),
+                Value::Float(f) => Ok(Value::Int(*f as i64)),
+                Value::Bool(b) => Ok(Value::Int(if *b { 1 } else { 0 })),
+                Value::Str(s) => Ok(s.trim().parse::<i64>().map(Value::Int).unwrap_or(Value::Nil)),
+                Value::Nil => Ok(Value::Nil),
+                _ => Ok(Value::Nil),
+            }
+        });
+        env.borrow_mut().define("parse_int", Value::Native(parse_int_fn), false);
+
+        let parse_float_fn: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(|args: &[Value]| {
+            if args.len() != 1 { return Err(RockError::runtime("parse_float() takes 1 argument")); }
+            match &args[0] {
+                Value::Int(i) => Ok(Value::Float(*i as f64)),
+                Value::Float(f) => Ok(Value::Float(*f)),
+                Value::Str(s) => Ok(s.trim().parse::<f64>().map(Value::Float).unwrap_or(Value::Nil)),
+                Value::Nil => Ok(Value::Nil),
+                _ => Ok(Value::Nil),
+            }
+        });
+        env.borrow_mut().define("parse_float", Value::Native(parse_float_fn), false);
+
+        let parse_bool_fn: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(|args: &[Value]| {
+            if args.len() != 1 { return Err(RockError::runtime("parse_bool() takes 1 argument")); }
+            match &args[0] {
+                Value::Bool(b) => Ok(Value::Bool(*b)),
+                Value::Int(i) => Ok(Value::Bool(*i != 0)),
+                Value::Str(s) => {
+                    let t = s.trim().to_ascii_lowercase();
+                    match t.as_str() {
+                        "true" | "yes" | "1" | "on" | "y" | "t" => Ok(Value::Bool(true)),
+                        "false" | "no" | "0" | "off" | "n" | "f" | "" => Ok(Value::Bool(false)),
+                        _ => Ok(Value::Nil),
+                    }
+                }
+                Value::Nil => Ok(Value::Nil),
+                _ => Ok(Value::Nil),
+            }
+        });
+        env.borrow_mut().define("parse_bool", Value::Native(parse_bool_fn), false);
 
         let assert_fn: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(|args: &[Value]| {
             if args.is_empty() { return Err(RockError::runtime("assert() takes at least 1 argument")); }
@@ -1803,6 +1857,19 @@ impl Interpreter {
                 Item::Import { path, alias, .. } => {
                     let pb = resolve_import_path(path, base_dir.as_deref())
                         .map_err(|e| RockError::runtime(format!("import '{}': {}", path, e)))?;
+                    let canonical = std::fs::canonicalize(&pb).unwrap_or_else(|_| pb.clone());
+                    if self.loading_imports.borrow().iter().any(|p| p == &canonical) {
+                        let chain: Vec<String> = self.loading_imports.borrow().iter()
+                            .map(|p| p.file_name().and_then(|s| s.to_str()).unwrap_or("?").to_string())
+                            .chain(std::iter::once(
+                                canonical.file_name().and_then(|s| s.to_str()).unwrap_or("?").to_string()
+                            ))
+                            .collect();
+                        return Err(RockError::runtime(format!(
+                            "circular import detected: {}", chain.join(" -> ")
+                        )));
+                    }
+                    self.loading_imports.borrow_mut().push(canonical.clone());
                     let src = std::fs::read_to_string(&pb).map_err(|e| {
                         RockError::runtime(format!("import '{}': {}", path, e))
                     })?;
@@ -1843,6 +1910,9 @@ impl Interpreter {
                             false,
                         );
                     }
+                    // Pop this path off the loading stack; mark as fully loaded.
+                    self.loading_imports.borrow_mut().pop();
+                    self.loaded_imports.borrow_mut().insert(canonical);
                 }
                 Item::Function(f) => {
                     let closure = Rc::new(Closure { func: Rc::new(f.clone()), captured: None });

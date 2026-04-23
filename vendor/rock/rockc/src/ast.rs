@@ -9,11 +9,11 @@ pub struct Program {
 pub enum Item {
     Function(Function),
     Stmt(Stmt),
-    Import { path: String, alias: Option<String>, span: Span },
+    Import { path: String, alias: Option<String>, is_pub: bool, span: Span },
     TypeDecl(TypeDecl),
     EnumDecl(EnumDecl),
     Impl(ImplBlock),
-    Const { name: String, value: Expr, span: Span },
+    Const { name: String, value: Expr, is_pub: bool, span: Span },
     StateMachine(StateMachineDecl),
     Prove(ProveBlock),
     Trait(TraitDecl),
@@ -25,6 +25,7 @@ pub struct EnumDecl {
     pub name: String,
     pub variants: Vec<Variant>,
     pub span: Span,
+    pub is_pub: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -90,6 +91,7 @@ pub struct TypeDecl {
     pub type_params: Vec<String>,
     pub fields: Vec<Field>,
     pub span: Span,
+    pub is_pub: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -114,6 +116,7 @@ pub struct Function {
     pub span: Span,
     pub attrs: Vec<Attribute>,
     pub has_self: bool,
+    pub is_pub: bool,
 }
 
 #[derive(Debug, Clone)]

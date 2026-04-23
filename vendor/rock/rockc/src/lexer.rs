@@ -341,6 +341,7 @@ impl<'a> Lexer<'a> {
             "enum" => Token::Enum,
             "try" => Token::Try,
             "catch" => Token::Catch,
+            "pub" => Token::Pub,
             _ => Token::Ident(s),
         })
     }

@@ -53,6 +53,7 @@ pub enum Token {
     Enum,
     Try,
     Catch,
+    Pub,
 
     Plus,
     Minus,

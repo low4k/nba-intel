@@ -55,18 +55,30 @@ impl Parser {
             self.pos = save;
         }
         let attrs = self.parse_attributes()?;
+        // Optional `pub` visibility modifier (M5 roadmap item #11).
+        // Default: all top-level items are public (backward compat).
+        // When a module marks *any* item `pub`, only `pub` items are exposed
+        // to importers of that module. See interpreter Item::Import handler.
+        let is_pub = self.matches(&Token::Pub);
         if self.check(&Token::Fn) {
             let mut f = self.parse_function()?;
             f.attrs = attrs;
+            f.is_pub = is_pub;
             Ok(Item::Function(f))
         } else if self.check(&Token::Type) {
-            Ok(Item::TypeDecl(self.parse_type_decl()?))
+            let mut td = self.parse_type_decl()?;
+            td.is_pub = is_pub;
+            Ok(Item::TypeDecl(td))
         } else if self.check(&Token::Enum) {
-            Ok(Item::EnumDecl(self.parse_enum_decl()?))
+            let mut ed = self.parse_enum_decl()?;
+            ed.is_pub = is_pub;
+            Ok(Item::EnumDecl(ed))
         } else if self.check(&Token::Impl) {
+            if is_pub { return Err(self.err("'pub' cannot be applied to 'impl' blocks")); }
             let item = self.parse_impl_or_trait_impl()?;
             Ok(item)
         } else if self.check(&Token::Trait) {
+            if is_pub { return Err(self.err("'pub' cannot be applied to 'trait' blocks")); }
             Ok(Item::Trait(self.parse_trait_decl()?))
         } else if self.check(&Token::Const) {
             let span = self.peek().span;
@@ -75,8 +87,9 @@ impl Parser {
             if self.matches(&Token::Colon) { let _ = self.parse_type()?; }
             self.expect(&Token::Assign, "expected '=' after const name")?;
             let value = self.parse_expr()?;
-            Ok(Item::Const { name, value, span })
+            Ok(Item::Const { name, value, is_pub, span })
         } else if self.check(&Token::StateMachine) {
+            if is_pub { return Err(self.err("'pub' cannot be applied to 'state_machine'")); }
             Ok(Item::StateMachine(self.parse_state_machine()?))
         } else if self.check(&Token::Import) {
             let span = self.peek().span;
@@ -98,10 +111,13 @@ impl Parser {
                     Some(alias_name)
                 } else { None }
             } else { None };
-            Ok(Item::Import { path, alias, span })
+            Ok(Item::Import { path, alias, is_pub, span })
         } else {
             if !attrs.is_empty() {
                 return Err(self.err("attributes only allowed on fn/type/impl/const"));
+            }
+            if is_pub {
+                return Err(self.err("'pub' must be followed by fn/type/enum/const/import"));
             }
             Ok(Item::Stmt(self.parse_stmt()?))
         }
@@ -148,7 +164,7 @@ impl Parser {
             if !self.matches(&Token::Comma) { break; }
         }
         self.expect(&Token::RBrace, "expected '}'")?;
-        Ok(TypeDecl { name, type_params, fields, span })
+        Ok(TypeDecl { name, type_params, fields, span, is_pub: false })
     }
 
     fn parse_enum_decl(&mut self) -> Result<EnumDecl> {
@@ -187,7 +203,7 @@ impl Parser {
             if !self.matches(&Token::Comma) { break; }
         }
         self.expect(&Token::RBrace, "expected '}'")?;
-        Ok(EnumDecl { name, variants, span })
+        Ok(EnumDecl { name, variants, span, is_pub: false })
     }
 
     fn parse_state_machine(&mut self) -> Result<StateMachineDecl> {
@@ -239,7 +255,7 @@ impl Parser {
             while self.matches(&Token::Semicolon) {}
             let body = Block { stmts: Vec::new(), span };
             let attrs = vec![Attribute { name: "extern_stub".to_string(), args: Vec::new() }];
-            fns.push(Function { name, params, body, span, attrs, has_self: false });
+            fns.push(Function { name, params, body, span, attrs, has_self: false, is_pub: false });
         }
         self.expect(&Token::RBrace, "expected '}' closing @extern")?;
         if fns.is_empty() {
@@ -364,6 +380,7 @@ impl Parser {
                     span: m_span,
                     attrs: Vec::new(),
                     has_self,
+                    is_pub: false,
                 })
             } else {
                 while self.matches(&Token::Semicolon) {}
@@ -455,7 +472,7 @@ impl Parser {
             let _ret = self.parse_type()?;
         }
         let body = self.parse_block()?;
-        Ok(Function { name, params, body, span, attrs: Vec::new(), has_self })
+        Ok(Function { name, params, body, span, attrs: Vec::new(), has_self, is_pub: false })
     }
 
     fn parse_type(&mut self) -> Result<String> {

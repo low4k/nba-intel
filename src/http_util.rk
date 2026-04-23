@@ -1,4 +1,4 @@
-fn read_request(conn) {
+pub fn read_request(conn) {
     let buf = net.read(conn, 65535)
     if buf == nil or buf == "" { return nil }
     let head_end = http_util.find_substring(buf, "\r\n\r\n")
@@ -23,7 +23,7 @@ fn read_request(conn) {
     }
 }
 
-fn parse_headers(lines) {
+pub fn parse_headers(lines) {
     let mut h = {}
     let mut i = 1
     while i < len(lines) {
@@ -40,7 +40,7 @@ fn parse_headers(lines) {
     h
 }
 
-fn parse_query(qs) {
+pub fn parse_query(qs) {
     let mut params = {}
     if qs == "" { return params }
     let pairs = strs.split(qs, "&")
@@ -57,7 +57,7 @@ fn parse_query(qs) {
     params
 }
 
-fn url_decode(s) {
+pub fn url_decode(s) {
     let mut out = ""
     let mut i = 0
     while i < len(s) {
@@ -72,7 +72,7 @@ fn url_decode(s) {
     out
 }
 
-fn decode_hex(hh) {
+pub fn decode_hex(hh) {
     try {
         let bytes = hex.decode(hh)
         return bytes
@@ -81,29 +81,29 @@ fn decode_hex(hh) {
     }
 }
 
-fn write_response(conn, status, body, content_type) {
+pub fn write_response(conn, status, body, content_type) {
     let status_text = http_util.status_phrase(status)
     let head = `HTTP/1.1 ${status} ${status_text}\r\nContent-Type: ${content_type}\r\nContent-Length: ${len(body)}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n`
     net.write(conn, head + body)
 }
 
-fn write_json(conn, status, value) {
+pub fn write_json(conn, status, value) {
     http_util.write_response(conn, status, json.stringify(value), "application/json; charset=utf-8")
 }
 
-fn write_text(conn, status, body) {
+pub fn write_text(conn, status, body) {
     http_util.write_response(conn, status, body, "text/plain; charset=utf-8")
 }
 
-fn write_html(conn, body) {
+pub fn write_html(conn, body) {
     http_util.write_response(conn, 200, body, "text/html; charset=utf-8")
 }
 
-fn write_static(conn, body, content_type) {
+pub fn write_static(conn, body, content_type) {
     http_util.write_response(conn, 200, body, content_type)
 }
 
-fn status_phrase(code) {
+pub fn status_phrase(code) {
     if code == 200 { "OK" }
     else if code == 201 { "Created" }
     else if code == 204 { "No Content" }
@@ -118,7 +118,7 @@ fn status_phrase(code) {
     else { "OK" }
 }
 
-fn find_substring(s, needle) {
+pub fn find_substring(s, needle) {
     let n = len(needle)
     if n == 0 { return 0 }
     let h = len(s)
@@ -137,14 +137,14 @@ fn find_substring(s, needle) {
     -1
 }
 
-fn sub(s, a, b) {
+pub fn sub(s, a, b) {
     let mut out = ""
     let mut i = a
     while i < b and i < len(s) { out = out + s[i]; i = i + 1 }
     out
 }
 
-fn ext_to_mime(ext) {
+pub fn ext_to_mime(ext) {
     if ext == ".html" { "text/html; charset=utf-8" }
     else if ext == ".css" { "text/css; charset=utf-8" }
     else if ext == ".js"  { "application/javascript; charset=utf-8" }
@@ -155,12 +155,12 @@ fn ext_to_mime(ext) {
     else { "application/octet-stream" }
 }
 
-fn path_starts_with(path, prefix) {
+pub fn path_starts_with(path, prefix) {
     if len(path) < len(prefix) { return false }
     http_util.sub(path, 0, len(prefix)) == prefix
 }
 
-fn path_segments(path) {
+pub fn path_segments(path) {
     let parts = strs.split(path, "/")
     let mut out = []
     for p in parts { if p != "" { push(out, p) } }

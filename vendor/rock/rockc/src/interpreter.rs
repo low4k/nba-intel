@@ -2107,6 +2107,39 @@ impl Interpreter {
                     *self.skip_main.borrow_mut() = prev_skip;
                     res?;
                     if let Some(alias_name) = alias {
+                        // `pub` visibility: collect the set of names the submodule
+                        // explicitly marked public. If the submodule uses `pub` at
+                        // all, only those names are exposed to the importer.
+                        // If it uses no `pub` at all, every top-level symbol is
+                        // exposed (backward compat with pre-pub code).
+                        let mut pub_names: std::collections::HashSet<String> =
+                            std::collections::HashSet::new();
+                        let mut any_pub = false;
+                        for it in &sub.items {
+                            match it {
+                                Item::Function(f) if f.is_pub => {
+                                    any_pub = true;
+                                    pub_names.insert(f.name.clone());
+                                }
+                                Item::Import { is_pub: true, alias: Some(a), .. } => {
+                                    any_pub = true;
+                                    pub_names.insert(a.clone());
+                                }
+                                Item::TypeDecl(td) if td.is_pub => {
+                                    any_pub = true;
+                                    pub_names.insert(td.name.clone());
+                                }
+                                Item::EnumDecl(ed) if ed.is_pub => {
+                                    any_pub = true;
+                                    pub_names.insert(ed.name.clone());
+                                }
+                                Item::Const { is_pub: true, name, .. } => {
+                                    any_pub = true;
+                                    pub_names.insert(name.clone());
+                                }
+                                _ => {}
+                            }
+                        }
                         // A module's alias Map should contain every top-level symbol the
                         // module defined, even symbols whose names collide with pre-existing
                         // builtins (e.g. a module defining `fn url_decode()` when `url.decode`
@@ -2122,12 +2155,19 @@ impl Interpreter {
                                 }
                             }).collect()
                         };
-                        let mut entries: Vec<(Value, Value)> = Vec::with_capacity(new_keys.len());
+                        let exposed_keys: Vec<String> = if any_pub {
+                            new_keys.iter().filter(|k| pub_names.contains(*k)).cloned().collect()
+                        } else {
+                            new_keys.clone()
+                        };
+                        let mut entries: Vec<(Value, Value)> = Vec::with_capacity(exposed_keys.len());
                         let mut to_undefine: Vec<String> = Vec::new();
                         for k in &new_keys {
                             if let Some(v) = self.globals.borrow().get(k) {
                                 let is_submodule_alias = matches!(v, Value::Map(_));
-                                entries.push((Value::Str(Rc::new(k.clone())), v));
+                                if exposed_keys.contains(k) {
+                                    entries.push((Value::Str(Rc::new(k.clone())), v));
+                                }
                                 if !is_submodule_alias {
                                     to_undefine.push(k.clone());
                                 }
@@ -2894,6 +2934,7 @@ impl Interpreter {
                     span: *span,
                     attrs: Vec::new(),
                     has_self: false,
+                    is_pub: false,
                 };
                 Ok(Value::Function(Rc::new(Closure {
                     func: Rc::new(func),

@@ -21,6 +21,7 @@ WORKDIR /app
 # Only the runtime assets — skip vendor/, data snapshots, etc.
 COPY src /app/src
 COPY rock.toml /app/rock.toml
+RUN mkdir -p /app/data
 
 # Render provides $PORT; default host becomes 0.0.0.0 when PORT is set
 # (see src/config.rk).

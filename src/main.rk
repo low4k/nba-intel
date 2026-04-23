@@ -14,9 +14,7 @@ import "server.rk" as server
 
 fn main() {
     let config = cfg.default_config()
-    if not fs.exists(config["data_dir"]) {
-        fs.write(`${config["data_dir"]}/.keep`, "")
-    }
+    fs.mkdir(config["data_dir"])
     let store = db.new_store(config["data_dir"])
     let live_state = live.live_state()
 

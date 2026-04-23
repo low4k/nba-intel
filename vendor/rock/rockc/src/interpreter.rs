@@ -815,6 +815,14 @@ impl Interpreter {
                 other => return Err(RockError::runtime(format!("fs.write: expected string path, got {}", other.type_name()))),
             };
             let content = args[1].to_string();
+            // Auto-create parent directories so fs.write is ergonomic for
+            // app data dirs, cache dirs, etc.
+            if let Some(parent) = std::path::Path::new(&path).parent() {
+                if !parent.as_os_str().is_empty() && !parent.exists() {
+                    std::fs::create_dir_all(parent)
+                        .map_err(|e| RockError::runtime(format!("fs.write '{}': mkdir parent: {}", path, e)))?;
+                }
+            }
             std::fs::write(&path, content)
                 .map(|_| Value::Nil)
                 .map_err(|e| RockError::runtime(format!("fs.write '{}': {}", path, e)))
@@ -851,11 +859,29 @@ impl Interpreter {
             }
             Ok(Value::Array(Rc::new(RefCell::new(names))))
         });
+        let eff_fs4 = effects.clone();
+        let fs_mkdir: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(move |args: &[Value]| {
+            {
+                let e = eff_fs4.borrow();
+                if e.no_io || e.pure_ {
+                    return Err(RockError::runtime("effect violation: 'fs.mkdir' not allowed in @no_io/@pure context"));
+                }
+            }
+            if args.len() != 1 { return Err(RockError::runtime("fs.mkdir: expected (path)")); }
+            let path = match &args[0] {
+                Value::Str(s) => s.as_str().to_string(),
+                other => return Err(RockError::runtime(format!("fs.mkdir: expected string, got {}", other.type_name()))),
+            };
+            std::fs::create_dir_all(&path)
+                .map(|_| Value::Nil)
+                .map_err(|e| RockError::runtime(format!("fs.mkdir '{}': {}", path, e)))
+        });
         let fs_mod = mk_map(vec![
             ("read", Value::Native(fs_read)),
             ("write", Value::Native(fs_write)),
             ("exists", Value::Native(fs_exists)),
             ("list", Value::Native(fs_list)),
+            ("mkdir", Value::Native(fs_mkdir)),
         ]);
         env.borrow_mut().define("fs", fs_mod, false);
 

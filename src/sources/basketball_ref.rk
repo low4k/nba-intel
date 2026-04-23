@@ -1,0 +1,86 @@
+import "../log.rk" as log
+
+
+fn fetch_page(path) {
+    try {
+        let resp = http.get("https://www.basketball-reference.com" + path)
+        return resp["body"]
+    } catch (e) {
+        log.warn(`${"basketball_ref"} fetch ${path}: ${e}`)
+        return nil
+    }
+}
+
+fn extract_table_rows(html, table_id) {
+    let needle = `id="${table_id}"`
+    let start = bref.strs_index_of(html, needle)
+    if start < 0 { return [] }
+    let after = bref.strs_substring(html, start, len(html))
+    let table_end = bref.strs_index_of(after, "</table>")
+    if table_end < 0 { return [] }
+    let table = bref.strs_substring(after, 0, table_end)
+    let rows = strs.split(table, "<tr")
+    let out = []
+    for r in rows {
+        let cells = strs.split(r, "<td")
+        if len(cells) < 3 { continue }
+        let row = []
+        for c in cells {
+            let gt = bref.strs_index_of(c, ">")
+            if gt < 0 { continue }
+            let inner = bref.strs_substring(c, gt + 1, len(c))
+            let lt = bref.strs_index_of(inner, "<")
+            if lt < 0 { continue }
+            push(row, strs.trim(bref.strs_substring(inner, 0, lt)))
+        }
+        if len(row) > 0 { push(out, row) }
+    }
+    out
+}
+
+fn strs_index_of(haystack, needle) {
+    if needle == "" { return 0 }
+    let h = len(haystack)
+    let n = len(needle)
+    if n > h { return -1 }
+    let mut i = 0
+    while i <= h - n {
+        let slice = bref.strs_substring(haystack, i, i + n)
+        if slice == needle { return i }
+        i = i + 1
+    }
+    -1
+}
+
+fn strs_substring(s, start, end) {
+    let mut out = ""
+    let mut i = start
+    while i < end and i < len(s) {
+        out = out + s[i]
+        i = i + 1
+    }
+    out
+}
+
+fn player_career(slug) {
+    let html = bref.fetch_page(`/players/${slug[0]}/${slug}.html`)
+    if html == nil { return nil }
+    {
+        "source": "basketball_ref",
+        "slug": slug,
+        "per_game": bref.extract_table_rows(html, "per_game"),
+        "advanced": bref.extract_table_rows(html, "advanced")
+    }
+}
+
+fn team_season(team, year) {
+    let html = bref.fetch_page(`/teams/${team}/${year}.html`)
+    if html == nil { return nil }
+    {
+        "source": "basketball_ref",
+        "team": team,
+        "year": year,
+        "roster": bref.extract_table_rows(html, "roster"),
+        "per_game": bref.extract_table_rows(html, "per_game")
+    }
+}

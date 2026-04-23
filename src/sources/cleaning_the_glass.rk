@@ -1,0 +1,62 @@
+import "../log.rk" as log
+
+
+fn fetch(path) {
+    try {
+        let resp = http.get(`https://cleaningtheglass.com${path}`)
+        return resp["body"]
+    } catch (e) {
+        log.warn(`${"cleaning_the_glass"} fetch ${path}: ${e}`)
+        return nil
+    }
+}
+
+fn team_efficiency(team) {
+    let html = ctg.fetch(`/team/${team}/efficiency`)
+    if html == nil { return nil }
+    {
+        "source": "cleaning_the_glass",
+        "team": team,
+        "filter": "garbage_time_excluded",
+        "off_rating": ctg.parse_metric(html, "Off Rating"),
+        "def_rating": ctg.parse_metric(html, "Def Rating"),
+        "net_rating": ctg.parse_metric(html, "Net Rating"),
+        "pace":       ctg.parse_metric(html, "Pace")
+    }
+}
+
+fn parse_metric(html, label) {
+    let i = ctg.scan(html, label)
+    if i < 0 { return nil }
+    let mut j = i + len(label)
+    while j < len(html) {
+        let c = html[j]
+        if (c >= "0" and c <= "9") or c == "-" { break }
+        j = j + 1
+    }
+    let mut num = ""
+    while j < len(html) {
+        let c = html[j]
+        if (c >= "0" and c <= "9") or c == "." or c == "-" { num = num + c }
+        else { break }
+        j = j + 1
+    }
+    if num == "" { return nil }
+    float(num)
+}
+
+fn scan(s, needle) {
+    let n = len(needle)
+    let mut i = 0
+    while i + n <= len(s) {
+        let mut ok = true
+        let mut k = 0
+        while k < n {
+            if s[i + k] != needle[k] { ok = false; break }
+            k = k + 1
+        }
+        if ok { return i }
+        i = i + 1
+    }
+    -1
+}

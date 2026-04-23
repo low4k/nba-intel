@@ -1,0 +1,66 @@
+import "sources/statmuse.rk" as muse
+
+fn parse(query) {
+    let q = strs.lower(strs.trim(query))
+    let intent = search.detect_intent(q)
+    let stat   = search.detect_stat(q)
+    let range_ = search.detect_range(q)
+    let scope  = search.detect_scope(q)
+    {
+        "raw": query,
+        "intent": intent,
+        "stat": stat,
+        "range": range_,
+        "scope": scope
+    }
+}
+
+fn run(store, query) {
+    let parsed = search.parse(query)
+    let muse_result = muse.ask(query)
+    {
+        "parsed": parsed,
+        "statmuse": muse_result
+    }
+}
+
+fn detect_intent(q) {
+    if search.contains_word(q, "leads") or search.contains_word(q, "leader") or search.contains_word(q, "most") { return "leaderboard" }
+    if search.contains_word(q, "compare") or search.contains_word(q, "vs") { return "compare" }
+    if search.contains_word(q, "average") or search.contains_word(q, "averaging") { return "average" }
+    if search.contains_word(q, "predict") or search.contains_word(q, "projection") or search.contains_word(q, "tonight") { return "predict" }
+    "lookup"
+}
+
+fn detect_stat(q) {
+    if search.contains_word(q, "points") or search.contains_word(q, "scoring") { return "PTS" }
+    if search.contains_word(q, "assists") { return "AST" }
+    if search.contains_word(q, "rebounds") { return "REB" }
+    if search.contains_word(q, "steals") { return "STL" }
+    if search.contains_word(q, "blocks") { return "BLK" }
+    if search.contains_word(q, "true shooting") or search.contains_word(q, "ts%") { return "TS_PCT" }
+    "PTS"
+}
+
+fn detect_range(q) {
+    if search.contains_word(q, "career") { return "career" }
+    if search.contains_word(q, "last 5")  { return "L5" }
+    if search.contains_word(q, "last 10") { return "L10" }
+    if search.contains_word(q, "last 15") { return "L15" }
+    if search.contains_word(q, "this season") or search.contains_word(q, "season") { return "season" }
+    if search.contains_word(q, "last season") { return "last_season" }
+    "season"
+}
+
+fn detect_scope(q) {
+    if search.contains_word(q, "point guard") or search.contains_word(q, "pg ") { return "PG" }
+    if search.contains_word(q, "shooting guard") or search.contains_word(q, "sg ") { return "SG" }
+    if search.contains_word(q, "small forward") or search.contains_word(q, "sf ") { return "SF" }
+    if search.contains_word(q, "power forward") or search.contains_word(q, "pf ") { return "PF" }
+    if search.contains_word(q, "center") { return "C" }
+    "all"
+}
+
+fn contains_word(haystack, needle) {
+    strs.contains(haystack, needle)
+}

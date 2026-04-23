@@ -1,0 +1,42 @@
+import "../log.rk" as log
+
+
+fn fetch(path) {
+    let url = `https://stats.nba.com/stats${path}`
+    try {
+        let resp = http.get(url)
+        return json.parse(resp["body"])
+    } catch (e) {
+        log.warn(`${"nba_official"} fetch ${path}: ${e}`)
+        return nil
+    }
+}
+
+fn player_profile(player_id) {
+    let data_ = nba.fetch(`/playerprofilev2?PlayerID=${player_id}&PerMode=PerGame`)
+    if data_ == nil { return nil }
+    {
+        "source": "nba_official",
+        "player_id": player_id,
+        "raw": data_
+    }
+}
+
+fn box_score(game_id) {
+    let data_ = nba.fetch(`/boxscoretraditionalv2?GameID=${game_id}`)
+    if data_ == nil { return nil }
+    { "source": "nba_official", "game_id": game_id, "raw": data_ }
+}
+
+fn live_scoreboard() {
+    let data_ = nba.fetch("/scoreboardv3?LeagueID=00&DayOffset=0")
+    if data_ == nil { return [] }
+    data_
+}
+
+fn shots(player_id, season) {
+    let q = `/shotchartdetail?PlayerID=${player_id}&Season=${season}&SeasonType=Regular+Season&TeamID=0&ContextMeasure=FGA`
+    let data_ = nba.fetch(q)
+    if data_ == nil { return [] }
+    { "source": "nba_official", "player_id": player_id, "season": season, "shots": data_ }
+}

@@ -1,0 +1,59 @@
+import "players.rk" as players
+import "predict.rk" as predict
+
+fn compare(store, a_id, b_id, options) {
+    let a = players.get(store, a_id)
+    let b = players.get(store, b_id)
+    let stat = options["stat"] ?? "PRA"
+    let proj_a = predict.project(a["game_log"], { "stat": stat, "min_minutes": options["min_minutes"] ?? 0 })
+    let proj_b = predict.project(b["game_log"], { "stat": stat, "min_minutes": options["min_minutes"] ?? 0 })
+    {
+        "stat": stat,
+        "a": { "id": a_id, "name": a["name"], "projection": proj_a },
+        "b": { "id": b_id, "name": b["name"], "projection": proj_b },
+        "delta_mean":     proj_a["mean"]            - proj_b["mean"],
+        "delta_next":     (proj_a["next_game_point"] ?? 0.0) - (proj_b["next_game_point"] ?? 0.0)
+    }
+}
+
+fn position_rank(player, all_players, position) {
+    let mut peers = []
+    for p in all_players {
+        if p["position"] == position { push(peers, p) }
+    }
+    let stats = ["pts", "reb", "ast", "ts_pct", "usg_pct"]
+    let mut ranks = {}
+    for s in stats {
+        let mut values = []
+        for p in peers {
+            let v = p["traditional"][s] ?? p["advanced"][s]
+            if v != nil { push(values, { "id": p["id"], "value": float(v) }) }
+        }
+        cmp.sort_desc(values)
+        let mut rank = 0
+        let mut i = 0
+        while i < len(values) {
+            if values[i]["id"] == player["id"] { rank = i + 1; break }
+            i = i + 1
+        }
+        ranks[s] = { "rank": rank, "of": len(values) }
+    }
+    ranks
+}
+
+fn sort_desc(arr) {
+    let n = len(arr)
+    let mut i = 0
+    while i < n - 1 {
+        let mut j = 0
+        while j < n - i - 1 {
+            if arr[j]["value"] < arr[j + 1]["value"] {
+                let tmp = arr[j]
+                arr[j] = arr[j + 1]
+                arr[j + 1] = tmp
+            }
+            j = j + 1
+        }
+        i = i + 1
+    }
+}

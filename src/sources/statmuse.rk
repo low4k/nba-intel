@@ -1,0 +1,78 @@
+import "../log.rk" as log
+
+
+fn fetch(query) {
+    let encoded = muse.url_encode(query)
+    try {
+        let resp = http.get(`https://www.statmuse.com/nba/ask?q=${encoded}`)
+        return resp["body"]
+    } catch (e) {
+        log.warn(`${"statmuse"} fetch '${query}': ${e}`)
+        return nil
+    }
+}
+
+fn url_encode(s) {
+    let mut out = ""
+    let mut i = 0
+    while i < len(s) {
+        let c = s[i]
+        if c == " " { out = out + "+" }
+        else if muse.is_safe(c) { out = out + c }
+        else { out = out + "%" + hex.encode(c) }
+        i = i + 1
+    }
+    out
+}
+
+fn is_safe(c) {
+    (c >= "a" and c <= "z")
+        or (c >= "A" and c <= "Z")
+        or (c >= "0" and c <= "9")
+        or c == "-" or c == "_" or c == "."
+}
+
+fn ask(question) {
+    let html = muse.fetch(question)
+    if html == nil { return nil }
+    {
+        "source": "statmuse",
+        "question": question,
+        "answer": muse.extract_answer(html)
+    }
+}
+
+fn extract_answer(html) {
+    let needle = "<h1"
+    let start = muse.find_after(html, needle, 0)
+    if start < 0 { return "" }
+    let close = muse.find_after(html, ">", start)
+    if close < 0 { return "" }
+    let after = close + 1
+    let end = muse.find_after(html, "</h1>", after)
+    if end < 0 { return "" }
+    muse.sub(html, after, end)
+}
+
+fn find_after(s, needle, from_) {
+    let n = len(needle)
+    let mut i = from_
+    while i + n <= len(s) {
+        let mut j = 0
+        let mut ok = true
+        while j < n {
+            if s[i + j] != needle[j] { ok = false; break }
+            j = j + 1
+        }
+        if ok { return i }
+        i = i + 1
+    }
+    -1
+}
+
+fn sub(s, a, b) {
+    let mut out = ""
+    let mut i = a
+    while i < b and i < len(s) { out = out + s[i]; i = i + 1 }
+    out
+}

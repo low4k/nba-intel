@@ -1,0 +1,44 @@
+import "../log.rk" as log
+
+
+fn fetch(path) {
+    try {
+        let resp = http.get(`https://api.pbpstats.com/${path}`)
+        return json.parse(resp["body"])
+    } catch (e) {
+        log.warn(`${"pbp_stats"} fetch ${path}: ${e}`)
+        return nil
+    }
+}
+
+fn possession_log(game_id) {
+    let data_ = pbp.fetch(`get-possessions/nba?GameId=${game_id}`)
+    if data_ == nil { return [] }
+    {
+        "source": "pbp_stats",
+        "game_id": game_id,
+        "possessions": data_
+    }
+}
+
+fn shot_quality(player_id, season) {
+    let data_ = pbp.fetch(`get-shot-quality/nba?Season=${season}&PlayerId=${player_id}`)
+    if data_ == nil { return nil }
+    {
+        "source": "pbp_stats",
+        "player_id": player_id,
+        "season": season,
+        "shot_quality": data_
+    }
+}
+
+fn late_clock(player_id, season) {
+    let data_ = pbp.fetch(`get-totals/nba?Season=${season}&SeasonType=Regular+Season&PlayerId=${player_id}&FromClockTime=4&ToClockTime=0`)
+    if data_ == nil { return nil }
+    {
+        "source": "pbp_stats",
+        "player_id": player_id,
+        "season": season,
+        "late_clock_totals": data_
+    }
+}

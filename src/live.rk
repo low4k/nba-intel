@@ -1,0 +1,117 @@
+import "log.rk" as log
+import "db.rk" as db
+import "sources/nba_official.rk" as nba
+
+fn live_state() {
+    {
+        "scoreboard": [],
+        "games": {},
+        "subscribers": [],
+        "last_poll_ms": 0
+    }
+}
+
+fn poll(state) {
+    let board = nba.live_scoreboard()
+    state["scoreboard"] = board
+    state["last_poll_ms"] = time.now_ms()
+    let games = live.extract_games(board)
+    for g in games {
+        let id = g["gameId"] ?? g["game_id"] ?? ""
+        if id != "" {
+            state["games"][id] = live.enrich_game(g)
+        }
+    }
+    live.notify_subscribers(state)
+    state
+}
+
+fn enrich_game(g) {
+    let home = g["homeTeam"] ?? {}
+    let away = g["awayTeam"] ?? {}
+    {
+        "game_id":    g["gameId"] ?? "",
+        "status":     g["gameStatusText"] ?? "",
+        "period":     g["period"] ?? 0,
+        "clock":      g["gameClock"] ?? "",
+        "home": {
+            "team":  home["teamTricode"] ?? "",
+            "score": home["score"] ?? 0
+        },
+        "away": {
+            "team":  away["teamTricode"] ?? "",
+            "score": away["score"] ?? 0
+        },
+        "win_probability": live.estimate_win_prob(g),
+        "pace_estimate":   live.estimate_pace(g),
+        "milestones":      live.detect_milestones(g)
+    }
+}
+
+fn extract_games(board) {
+    if board == nil { return [] }
+    if has(board, "scoreboard") {
+        let sb = board["scoreboard"]
+        if has(sb, "games") { return sb["games"] }
+    }
+    if has(board, "games") { return board["games"] }
+    return []
+}
+
+fn estimate_win_prob(g) {
+    let home = g["homeTeam"] ?? {}
+    let away = g["awayTeam"] ?? {}
+    let h = home["score"] ?? 0
+    let a = away["score"] ?? 0
+    let period = g["period"] ?? 1
+    let diff = float(h - a)
+    let elapsed = float(period) / 4.0
+    let weight = 0.5 + elapsed * 0.5
+    let data_ = 0.5 + (diff / 30.0) * weight
+    if data_ < 0.01 { 0.01 } else if data_ > 0.99 { 0.99 } else { data_ }
+}
+
+fn estimate_pace(g) {
+    let home = g["homeTeam"] ?? {}
+    let away = g["awayTeam"] ?? {}
+    let total = (home["score"] ?? 0) + (away["score"] ?? 0)
+    let period = g["period"] ?? 1
+    if period <= 0 { 0.0 } else { float(total) / float(period) * 4.0 }
+}
+
+fn detect_milestones(g) {
+    let mut hits = []
+    let teams = [g["homeTeam"] ?? {}, g["awayTeam"] ?? {}]
+    for t in teams {
+        let players = t["players"] ?? []
+        for p in players {
+            let pts = p["statistics"] ?? {}
+            let scored = pts["points"] ?? 0
+            if scored >= 30 { push(hits, { "kind": "30pt_game", "player": p["name"] ?? "" }) }
+            if scored >= 50 { push(hits, { "kind": "50pt_game", "player": p["name"] ?? "" }) }
+            let r = pts["reboundsTotal"] ?? 0
+            let a = pts["assists"] ?? 0
+            if scored >= 10 and r >= 10 and a >= 10 {
+                push(hits, { "kind": "triple_double", "player": p["name"] ?? "" })
+            }
+        }
+    }
+    hits
+}
+
+fn subscribe(state, callback) {
+    push(state["subscribers"], callback)
+}
+
+fn notify_subscribers(state) {
+    for cb in state["subscribers"] {
+        try { cb(state) } catch (e) { log.warn(`subscriber failed: ${e}`) }
+    }
+}
+
+fn poll_loop(state, interval_seconds) {
+    loop {
+        try { live.poll(state) } catch (e) { log.error(`live poll: ${e}`) }
+        time.sleep_ms(interval_seconds * 1000)
+    }
+}

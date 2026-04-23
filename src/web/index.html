@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NBA Intel</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body data-theme="dark">
+<header>
+  <h1>NBA Intel</h1>
+  <nav>
+    <button data-tab="dashboard" class="active">Dashboard</button>
+    <button data-tab="player">Player</button>
+    <button data-tab="team">Team</button>
+    <button data-tab="predict">Predict</button>
+    <button data-tab="compare">Compare</button>
+    <button data-tab="search">Search</button>
+    <button data-tab="live">Live</button>
+  </nav>
+  <button id="theme-toggle">light</button>
+</header>
+
+<main>
+  <section data-panel="dashboard" class="visible">
+    <div class="grid">
+      <div class="card"><h2>Live games</h2><div id="dash-live">loading...</div></div>
+      <div class="card"><h2>Today's leaders</h2><div id="dash-leaders">loading...</div></div>
+      <div class="card"><h2>Pinned players</h2><div id="dash-pinned">add a player from the Player tab</div></div>
+    </div>
+  </section>
+
+  <section data-panel="player">
+    <div class="card">
+      <h2>Player profile</h2>
+      <input id="player-id" placeholder="player id (e.g. 2544)">
+      <button id="player-load">Load</button>
+      <pre id="player-out"></pre>
+    </div>
+  </section>
+
+  <section data-panel="team">
+    <div class="card">
+      <h2>Team page</h2>
+      <input id="team-id" placeholder="team id (e.g. BOS-2026)">
+      <button id="team-load">Load</button>
+      <pre id="team-out"></pre>
+    </div>
+  </section>
+
+  <section data-panel="predict">
+    <div class="card">
+      <h2>Stat projection</h2>
+      <div class="row">
+        <input id="pred-id" placeholder="player id">
+        <select id="pred-stat">
+          <option>PTS</option><option>REB</option><option>AST</option>
+          <option>STL</option><option>BLK</option><option>TOV</option>
+          <option>PRA</option><option>PR</option><option>PA</option><option>RA</option>
+          <option>FG_PCT</option><option>FG3_PCT</option>
+        </select>
+        <select id="pred-range">
+          <option>L5</option><option>L10</option><option>L15</option>
+          <option>7-day</option><option>1-month</option><option>3-month</option>
+          <option selected>season</option><option>last_season</option>
+          <option>career</option>
+        </select>
+      </div>
+      <div class="row">
+        <label><input id="pred-garbage" type="checkbox"> exclude garbage time</label>
+        <label>min minutes <input id="pred-min" type="number" value="0" min="0"></label>
+        <label>opponent DRtg <input id="pred-opp" type="number" value="113" step="0.1"></label>
+        <label>rest days <input id="pred-rest" type="number" value="1" min="0"></label>
+      </div>
+      <canvas id="pred-chart" width="900" height="320"></canvas>
+      <div id="pred-summary"></div>
+    </div>
+  </section>
+
+  <section data-panel="compare">
+    <div class="card">
+      <h2>Player vs player</h2>
+      <div class="row">
+        <input id="cmp-a" placeholder="player A id">
+        <input id="cmp-b" placeholder="player B id">
+        <select id="cmp-stat">
+          <option>PRA</option><option>PTS</option><option>REB</option><option>AST</option>
+        </select>
+        <button id="cmp-go">Compare</button>
+      </div>
+      <pre id="cmp-out"></pre>
+    </div>
+  </section>
+
+  <section data-panel="search">
+    <div class="card">
+      <h2>Natural language search</h2>
+      <input id="search-q" placeholder="who leads the NBA in assists per game this season among point guards?">
+      <button id="search-go">Ask</button>
+      <pre id="search-out"></pre>
+    </div>
+  </section>
+
+  <section data-panel="live">
+    <div class="card">
+      <h2>Live games</h2>
+      <div id="live-list">loading...</div>
+    </div>
+  </section>
+</main>
+
+<footer><span>NBA Intel · written in <a href="https://github.com/low4k/rock">Rock</a></span></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

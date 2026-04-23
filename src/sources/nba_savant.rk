@@ -1,0 +1,67 @@
+import "../log.rk" as log
+
+
+fn fetch(path) {
+    try {
+        let resp = http.get(`https://nbasavant.com${path}`)
+        return resp["body"]
+    } catch (e) {
+        log.warn(`${"nba_savant"} fetch ${path}: ${e}`)
+        return nil
+    }
+}
+
+fn shot_chart(player_id, season) {
+    let html = savant.fetch(`/shot-chart?player=${player_id}&season=${season}`)
+    if html == nil { return nil }
+    {
+        "source": "nba_savant",
+        "player_id": player_id,
+        "season": season,
+        "zones": savant.parse_zones(html)
+    }
+}
+
+fn parse_zones(html) {
+    let zones = ["Restricted Area", "In The Paint", "Mid-Range", "Left Corner 3", "Right Corner 3", "Above the Break 3"]
+    let mut out = {}
+    for z in zones {
+        out[z] = savant.parse_pct(html, z)
+    }
+    out
+}
+
+fn parse_pct(html, label) {
+    let i = savant.find(html, label)
+    if i < 0 { return nil }
+    let mut j = i + len(label)
+    while j < len(html) {
+        let c = html[j]
+        if c >= "0" and c <= "9" { break }
+        j = j + 1
+    }
+    let mut num = ""
+    while j < len(html) {
+        let c = html[j]
+        if (c >= "0" and c <= "9") or c == "." { num = num + c }
+        else { break }
+        j = j + 1
+    }
+    if num == "" { nil } else { float(num) }
+}
+
+fn find(s, needle) {
+    let n = len(needle)
+    let mut i = 0
+    while i + n <= len(s) {
+        let mut k = 0
+        let mut ok = true
+        while k < n {
+            if s[i + k] != needle[k] { ok = false; break }
+            k = k + 1
+        }
+        if ok { return i }
+        i = i + 1
+    }
+    -1
+}

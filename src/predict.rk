@@ -1,0 +1,205 @@
+fn project(game_log, options) {
+    let games = predict.filter(game_log, options)
+    let stat = options["stat"]
+    let series = predict.extract_series(games, stat)
+    if len(series) == 0 {
+        return {
+            "stat": stat,
+            "samples": 0,
+            "mean": 0.0,
+            "stddev": 0.0,
+            "trend_slope": 0.0,
+            "trend_intercept": 0.0,
+            "smoothed": [],
+            "next_game_point": nil,
+            "next_game_low": nil,
+            "next_game_high": nil,
+            "anomalies": [],
+            "series": []
+        }
+    }
+    let m = predict.mean(series)
+    let sd = predict.stddev(series, m)
+    let trend = predict.linear_regression(series)
+    let smoothed = predict.loess(series, 0.3)
+    let projected = trend["intercept"] + trend["slope"] * float(len(series))
+    let opp_factor = predict.opponent_adjustment(options)
+    let rest_factor = predict.rest_adjustment(options)
+    let pace_factor = predict.pace_adjustment(options)
+    let projected_adj = projected * opp_factor * rest_factor * pace_factor
+
+    let anomalies = []
+    let mut idx = 0
+    while idx < len(series) {
+        let z = if sd > 0.0001 { (series[idx] - m) / sd } else { 0.0 }
+        if z > 2.0 or z < -2.0 {
+            push(anomalies, {
+                "index": idx,
+                "value": series[idx],
+                "z_score": z,
+                "game": games[idx]
+            })
+        }
+        idx = idx + 1
+    }
+
+    {
+        "stat": stat,
+        "samples": len(series),
+        "mean": m,
+        "stddev": sd,
+        "trend_slope": trend["slope"],
+        "trend_intercept": trend["intercept"],
+        "smoothed": smoothed,
+        "next_game_point": projected_adj,
+        "next_game_low":  projected_adj - sd,
+        "next_game_high": projected_adj + sd,
+        "anomalies": anomalies,
+        "series": series,
+        "adjustments_applied": {
+            "opponent": opp_factor,
+            "rest": rest_factor,
+            "pace": pace_factor
+        }
+    }
+}
+
+fn filter(game_log, options) {
+    let mut out = []
+    let min_minutes = options["min_minutes"] ?? 0
+    let exclude_garbage = options["exclude_garbage"] ?? false
+    let venue = options["venue"] ?? "any"
+    let outcome = options["outcome"] ?? "any"
+
+    for g in game_log {
+        if g["minutes"] < min_minutes { continue }
+        if exclude_garbage and g["is_garbage_time"] == true { continue }
+        if venue == "home" and g["venue"] != "home" { continue }
+        if venue == "away" and g["venue"] != "away" { continue }
+        if outcome == "win" and g["result"] != "W" { continue }
+        if outcome == "loss" and g["result"] != "L" { continue }
+        push(out, g)
+    }
+    out
+}
+
+fn extract_series(games, stat) {
+    let mut s = []
+    for g in games {
+        let v = predict.stat_value(g, stat)
+        if v != nil { push(s, v) }
+    }
+    s
+}
+
+fn stat_value(game, stat) {
+    if stat == "PRA" {
+        let p = game["pts"] ?? 0
+        let r = game["reb"] ?? 0
+        let a = game["ast"] ?? 0
+        return float(p + r + a)
+    }
+    if stat == "PR" { return float((game["pts"] ?? 0) + (game["reb"] ?? 0)) }
+    if stat == "PA" { return float((game["pts"] ?? 0) + (game["ast"] ?? 0)) }
+    if stat == "RA" { return float((game["reb"] ?? 0) + (game["ast"] ?? 0)) }
+    let key = predict.stat_key(stat)
+    let v = game[key]
+    if v == nil { nil } else { float(v) }
+}
+
+fn stat_key(stat) {
+    let lower = strs.lower(stat)
+    if lower == "pts" or lower == "points" { return "pts" }
+    if lower == "reb" or lower == "rebounds" { return "reb" }
+    if lower == "ast" or lower == "assists" { return "ast" }
+    if lower == "stl" or lower == "steals" { return "stl" }
+    if lower == "blk" or lower == "blocks" { return "blk" }
+    if lower == "tov" or lower == "turnovers" { return "tov" }
+    if lower == "fg_pct" { return "fg_pct" }
+    if lower == "fg3_pct" or lower == "3p_pct" { return "fg3_pct" }
+    if lower == "ft_pct" { return "ft_pct" }
+    if lower == "min" or lower == "minutes" { return "minutes" }
+    lower
+}
+
+fn mean(xs) {
+    if len(xs) == 0 { return 0.0 }
+    let mut t = 0.0
+    for x in xs { t = t + x }
+    t / float(len(xs))
+}
+
+fn stddev(xs, m) {
+    if len(xs) < 2 { return 0.0 }
+    let mut acc = 0.0
+    for x in xs { let d = x - m; acc = acc + d * d }
+    math.sqrt(acc / float(len(xs) - 1))
+}
+
+fn linear_regression(xs) {
+    let n = len(xs)
+    if n < 2 { return { "slope": 0.0, "intercept": if n == 1 { xs[0] } else { 0.0 } } }
+    let mut sum_x = 0.0
+    let mut sum_y = 0.0
+    let mut sum_xy = 0.0
+    let mut sum_xx = 0.0
+    let mut i = 0
+    while i < n {
+        let x = float(i)
+        let y = xs[i]
+        sum_x  = sum_x + x
+        sum_y  = sum_y + y
+        sum_xy = sum_xy + x * y
+        sum_xx = sum_xx + x * x
+        i = i + 1
+    }
+    let nf = float(n)
+    let denom = nf * sum_xx - sum_x * sum_x
+    if denom == 0.0 { return { "slope": 0.0, "intercept": sum_y / nf } }
+    let slope = (nf * sum_xy - sum_x * sum_y) / denom
+    let intercept = (sum_y - slope * sum_x) / nf
+    { "slope": slope, "intercept": intercept }
+}
+
+fn loess(xs, bandwidth) {
+    let n = len(xs)
+    if n == 0 { return [] }
+    let window = predict.max_int(2, int(float(n) * bandwidth))
+    let mut out = []
+    let mut i = 0
+    while i < n {
+        let lo = predict.max_int(0, i - window / 2)
+        let hi = predict.min_int(n, i + window / 2 + 1)
+        let mut acc = 0.0
+        let mut k = lo
+        while k < hi { acc = acc + xs[k]; k = k + 1 }
+        push(out, acc / float(hi - lo))
+        i = i + 1
+    }
+    out
+}
+
+fn max_int(a, b) { if a > b { a } else { b } }
+fn min_int(a, b) { if a < b { a } else { b } }
+
+fn opponent_adjustment(options) {
+    let drtg = options["opponent_def_rating"] ?? 113.0
+    let baseline = 113.0
+    let factor = baseline / drtg
+    if factor < 0.85 { 0.85 } else if factor > 1.15 { 1.15 } else { factor }
+}
+
+fn rest_adjustment(options) {
+    let rest = options["rest_days"] ?? 1
+    if rest <= 0 { 0.96 }
+    else if rest == 1 { 1.0 }
+    else if rest == 2 { 1.02 }
+    else { 1.03 }
+}
+
+fn pace_adjustment(options) {
+    let mode = options["pace_mode"] ?? "raw"
+    if mode == "per_36" { 1.0 }
+    else if mode == "per_100" { 1.0 }
+    else { 1.0 }
+}

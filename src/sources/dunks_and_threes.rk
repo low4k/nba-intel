@@ -1,0 +1,71 @@
+import "../log.rk" as log
+
+
+fn fetch(path) {
+    try {
+        let resp = http.get(`https://dunksandthrees.com${path}`)
+        return resp["body"]
+    } catch (e) {
+        log.warn(`${"dunks_and_threes"} fetch ${path}: ${e}`)
+        return nil
+    }
+}
+
+fn epm_leaderboard() {
+    let html = dt.fetch("/epm")
+    if html == nil { return [] }
+    {
+        "source": "dunks_and_threes",
+        "metric": "EPM",
+        "html_size": len(html),
+        "fetched_at": time.now_iso()
+    }
+}
+
+fn player_epm(player_slug) {
+    let html = dt.fetch(`/player/${player_slug}`)
+    if html == nil { return nil }
+    {
+        "source": "dunks_and_threes",
+        "slug": player_slug,
+        "epm":     dt.parse_value(html, "EPM"),
+        "off_epm": dt.parse_value(html, "Offensive EPM"),
+        "def_epm": dt.parse_value(html, "Defensive EPM"),
+        "fetched_at": time.now_iso()
+    }
+}
+
+fn parse_value(html, label) {
+    let i = dt.find(html, label)
+    if i < 0 { return nil }
+    let mut j = i + len(label)
+    while j < len(html) {
+        let c = html[j]
+        if (c >= "0" and c <= "9") or c == "-" { break }
+        j = j + 1
+    }
+    let mut num = ""
+    while j < len(html) {
+        let c = html[j]
+        if (c >= "0" and c <= "9") or c == "." or c == "-" { num = num + c }
+        else { break }
+        j = j + 1
+    }
+    if num == "" { nil } else { float(num) }
+}
+
+fn find(s, needle) {
+    let n = len(needle)
+    let mut i = 0
+    while i + n <= len(s) {
+        let mut k = 0
+        let mut ok = true
+        while k < n {
+            if s[i + k] != needle[k] { ok = false; break }
+            k = k + 1
+        }
+        if ok { return i }
+        i = i + 1
+    }
+    -1
+}

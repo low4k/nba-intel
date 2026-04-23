@@ -1,0 +1,62 @@
+import "../log.rk" as log
+
+
+fn fetch_player(player_slug) {
+    let url = `https://www.bball-index.com/player/${player_slug}/`
+    try {
+        let resp = http.get(url)
+        return resp["body"]
+    } catch (e) {
+        log.warn(`${"bball_index"} fetch ${player_slug}: ${e}`)
+        return nil
+    }
+}
+
+fn role_grades(player_slug) {
+    let html = bbi.fetch_player(player_slug)
+    if html == nil { return nil }
+    {
+        "source": "bball_index",
+        "slug": player_slug,
+        "role_versatility": bbi.parse_grade(html, "Role Versatility"),
+        "matchup_difficulty": bbi.parse_grade(html, "Matchup Difficulty"),
+        "perimeter_defense": bbi.parse_grade(html, "Perimeter Defense"),
+        "interior_defense": bbi.parse_grade(html, "Interior Defense"),
+        "offensive_load": bbi.parse_grade(html, "Offensive Load"),
+        "shot_creation": bbi.parse_grade(html, "Shot Creation")
+    }
+}
+
+fn parse_grade(html, label) {
+    let i = bbi.scan(html, label)
+    if i < 0 { return nil }
+    let after = i + len(label)
+    let mut grade = ""
+    let mut j = after
+    while j < len(html) and len(grade) < 3 {
+        let c = html[j]
+        if c == "A" or c == "B" or c == "C" or c == "D" or c == "F" or c == "+" or c == "-" {
+            grade = grade + c
+        } else if grade != "" {
+            break
+        }
+        j = j + 1
+    }
+    grade
+}
+
+fn scan(s, needle) {
+    let n = len(needle)
+    let mut i = 0
+    while i + n <= len(s) {
+        let mut k = 0
+        let mut ok = true
+        while k < n {
+            if s[i + k] != needle[k] { ok = false; break }
+            k = k + 1
+        }
+        if ok { return i }
+        i = i + 1
+    }
+    -1
+}

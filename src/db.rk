@@ -1,0 +1,59 @@
+import "log.rk" as log
+
+fn new_store(data_dir) {
+    {
+        "data_dir": data_dir,
+        "cache": {},
+        "cache_at": {},
+        "subscribers": []
+    }
+}
+
+fn now() { time.now_ms() }
+
+fn cache_get(store, key, ttl_ms) {
+    let cache = store["cache"]
+    let stamps = store["cache_at"]
+    let v = cache[key]
+    if v == nil { return nil }
+    let age = db.now() - stamps[key]
+    if age > ttl_ms { return nil }
+    v
+}
+
+fn cache_put(store, key, value) {
+    store["cache"][key] = value
+    store["cache_at"][key] = db.now()
+    value
+}
+
+fn cache_invalidate(store, key) {
+    store["cache"][key] = nil
+    store["cache_at"][key] = nil
+}
+
+fn snapshot_path(store, kind, id) {
+    `${store["data_dir"]}/${kind}_${id}.json`
+}
+
+fn save_snapshot(store, kind, id, value) {
+    let p = db.snapshot_path(store, kind, id)
+    try {
+        fs.write(p, json.stringify(value))
+    } catch (e) {
+        log.warn(`could not save snapshot ${p}: ${e}`)
+    }
+    value
+}
+
+fn load_snapshot(store, kind, id) {
+    let p = db.snapshot_path(store, kind, id)
+    if not fs.exists(p) { return nil }
+    try {
+        let data_ = fs.read(p)
+        return json.parse(data_)
+    } catch (e) {
+        log.warn(`could not load snapshot ${p}: ${e}`)
+        return nil
+    }
+}

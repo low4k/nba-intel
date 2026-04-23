@@ -1,0 +1,133 @@
+fn empty_player() {
+    {
+        "id": "",
+        "name": "",
+        "team": "",
+        "position": "",
+        "age": 0,
+        "height_in": 0,
+        "weight_lb": 0,
+        "contract": {},
+        "injury": "",
+        "season": "",
+        "traditional": norm.empty_traditional(),
+        "advanced": norm.empty_advanced(),
+        "tracking": norm.empty_tracking(),
+        "pbp_derived": norm.empty_pbp(),
+        "defense": {},
+        "shooting_zones": {},
+        "lineups": {},
+        "game_log": [],
+        "sources_used": [],
+        "field_provenance": {},
+        "discrepancies": []
+    }
+}
+
+fn empty_traditional() {
+    {
+        "gp": 0, "min": 0.0, "pts": 0.0, "reb": 0.0, "ast": 0.0,
+        "stl": 0.0, "blk": 0.0, "tov": 0.0,
+        "fg_pct": 0.0, "fg3_pct": 0.0, "ft_pct": 0.0
+    }
+}
+
+fn empty_advanced() {
+    {
+        "per": 0.0, "vorp": 0.0, "bpm": 0.0, "obpm": 0.0, "dbpm": 0.0,
+        "ws": 0.0, "ws48": 0.0, "ts_pct": 0.0, "usg_pct": 0.0,
+        "epm": nil, "off_epm": nil, "def_epm": nil
+    }
+}
+
+fn empty_tracking() {
+    {
+        "speed": 0.0, "distance_mi": 0.0, "touches": 0,
+        "paint_pts": 0.0, "second_chance_pts": 0.0, "contested_shots": 0
+    }
+}
+
+fn empty_pbp() {
+    {
+        "ppp": 0.0, "shot_quality": nil, "late_clock_efficiency": nil,
+        "garbage_time_filtered": true
+    }
+}
+
+fn merge_traditional(player, src_name, payload) {
+    if payload == nil { return player }
+    norm.record_source(player, src_name)
+    let pairs = [
+        ["PTS","pts"], ["REB","reb"], ["AST","ast"], ["STL","stl"],
+        ["BLK","blk"], ["TOV","tov"],
+        ["FG_PCT","fg_pct"], ["FG3_PCT","fg3_pct"], ["FT_PCT","ft_pct"],
+    ]
+    for p in pairs {
+        if has(payload, p[0]) {
+            norm.fill(player["traditional"], p[1], payload[p[0]], src_name, player)
+        }
+    }
+    player
+}
+
+fn merge_advanced(player, src_name, payload) {
+    if payload == nil { return player }
+    norm.record_source(player, src_name)
+    let pairs = [
+        ["PER","per"], ["VORP","vorp"], ["BPM","bpm"], ["OBPM","obpm"],
+        ["DBPM","dbpm"], ["WS","ws"], ["WS_48","ws48"],
+        ["TS_PCT","ts_pct"], ["USG_PCT","usg_pct"],
+        ["epm","epm"], ["off_epm","off_epm"], ["def_epm","def_epm"],
+    ]
+    for p in pairs {
+        if has(payload, p[0]) {
+            norm.fill(player["advanced"], p[1], payload[p[0]], src_name, player)
+        }
+    }
+    player
+}
+
+fn fill(target_map, field, value, src_name, player) {
+    let prev = target_map[field]
+    let prev_src = player["field_provenance"][field]
+    if prev != nil and prev != value {
+        if norm.numeric(prev) and norm.numeric(value) {
+            if abs(prev - value) > norm.tolerance(field) {
+                push(player["discrepancies"], {
+                    "field": field,
+                    "previous": prev,
+                    "previous_source": prev_src,
+                    "new": value,
+                    "new_source": src_name
+                })
+            }
+        }
+    }
+    target_map[field] = value
+    player["field_provenance"][field] = src_name
+}
+
+fn numeric(v) {
+    if v == nil { return false }
+    if v == true or v == false { return false }
+    let s = str(v)
+    if len(s) == 0 { return false }
+    let c = s[0]
+    (c >= "0" and c <= "9") or c == "-" or c == "."
+}
+
+fn tolerance(field) {
+    let pct_fields = ["ts_pct","usg_pct","fg_pct","fg3_pct","ft_pct","ws48"]
+    let big_fields = ["per","bpm","obpm","dbpm","epm","off_epm","def_epm"]
+    for f in pct_fields { if f == field { return 0.01 } }
+    for f in big_fields { if f == field { return 0.5 } }
+    0.1
+}
+
+fn record_source(player, src_name) {
+    for s in player["sources_used"] {
+        if s == src_name { return player }
+    }
+    push(player["sources_used"], src_name)
+    player
+}

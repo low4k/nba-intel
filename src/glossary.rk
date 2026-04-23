@@ -1,0 +1,56 @@
+fn glossary() {
+    {
+        "PTS": "Points per game.",
+        "REB": "Total rebounds per game.",
+        "AST": "Assists per game.",
+        "STL": "Steals per game.",
+        "BLK": "Blocks per game.",
+        "TOV": "Turnovers per game.",
+        "FG_PCT": "Field-goal percentage. Made field goals divided by attempts.",
+        "FG3_PCT": "Three-point percentage.",
+        "FT_PCT": "Free-throw percentage.",
+        "PER":  "Player Efficiency Rating. Per-minute rating where league average is 15.",
+        "VORP": "Value Over Replacement Player. Box-score points above a -2.0 BPM bench-level player, per 100 possessions, scaled to season length.",
+        "BPM":  "Box Plus/Minus. Per-100-possession contribution above a league-average player, derived from box-score stats.",
+        "OBPM": "Offensive component of BPM.",
+        "DBPM": "Defensive component of BPM.",
+        "WS":   "Win Shares. Estimate of total wins a player has produced.",
+        "WS_48": "Win Shares per 48 minutes. Per-minute rate stat (league average ~0.100).",
+        "TS_PCT":  "True Shooting Percentage. Scoring efficiency that accounts for FG, 3PT, and FT.",
+        "USG_PCT": "Usage Rate. Percent of team plays a player ends while on the floor.",
+        "EPM":     "Estimated Plus/Minus from Dunks & Threes. Per-100-possession impact from a regularized model.",
+        "off_epm": "Offensive component of EPM.",
+        "def_epm": "Defensive component of EPM.",
+        "PPP":     "Points per possession.",
+        "shot_quality":          "Expected effective FG% on a player's shots based on location, defender distance, and clock time.",
+        "late_clock_efficiency": "Scoring efficiency on possessions ending in the final 4 seconds of the shot clock.",
+        "garbage_time_filtered": "Whether garbage-time possessions (lopsided score with little time left) have been excluded.",
+        "pace":  "Possessions per 48 minutes.",
+        "off_rating": "Points scored per 100 possessions.",
+        "def_rating": "Points allowed per 100 possessions.",
+        "net_rating": "Off rating minus def rating.",
+        "speed":         "Average miles per hour while on court.",
+        "distance_mi":   "Total miles traveled.",
+        "touches":       "Number of times a player touched the ball.",
+        "paint_pts":     "Points scored inside the paint.",
+        "second_chance_pts": "Points scored after an offensive rebound.",
+        "contested_shots":   "Defensive contests within ~3.5 ft of a shooter."
+    }
+}
+
+fn explain(metric) {
+    let g = glossary.glossary()
+    if has(g, metric) { g[metric] } else { "" }
+}
+
+fn annotate(payload) {
+    let g = glossary.glossary()
+    let mut out = {}
+    for k in keys(payload) {
+        out[k] = {
+            "value": payload[k],
+            "explanation": if has(g, k) { g[k] } else { "" }
+        }
+    }
+    out
+}

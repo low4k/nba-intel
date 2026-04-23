@@ -1,0 +1,146 @@
+import "log.rk" as log
+import "http_util.rk" as http_util
+import "config.rk" as cfg
+import "db.rk" as db
+import "players.rk" as players
+import "teams.rk" as teams
+import "predict.rk" as predict
+import "compare.rk" as cmp
+import "search.rk" as search
+import "live.rk" as live
+import "glossary.rk" as gloss
+
+fn serve(config, store, live_state) {
+    let listener = net.listen(`${config["host"]}:${config["port"]}`)
+    log.info(`listening on http://${config["host"]}:${config["port"]}`)
+    loop {
+        let acc = net.accept(listener)
+        spawn server.handle(acc["conn"], config, store, live_state)
+    }
+}
+
+fn handle(conn, config, store, live_state) {
+    try {
+        let req = http_util.read_request(conn)
+        if req == nil { net.close(conn); return nil }
+        server.route(conn, req, config, store, live_state)
+    } catch (e) {
+        log.error(`handler crashed: ${e}`)
+        try { http_util.write_text(conn, 500, `internal error: ${e}`) } catch (_) { }
+    }
+    net.close(conn)
+}
+
+fn route(conn, req, config, store, live_state) {
+    let path = req["path"]
+    let method = req["method"]
+    log.info(`${method} ${path}`)
+
+    if path == "/" or path == "/index.html" {
+        return server.serve_static(conn, config, "index.html")
+    }
+    if http_util.path_starts_with(path, "/static/") {
+        let rest = http_util.sub(path, len("/static/"), len(path))
+        return server.serve_static(conn, config, rest)
+    }
+
+    if path == "/api/health" {
+        return http_util.write_json(conn, 200, { "ok": true, "time": time.now_iso() })
+    }
+
+    if path == "/api/glossary" {
+        let g = gloss.glossary()
+        return http_util.write_json(conn, 200, g)
+    }
+
+    if http_util.path_starts_with(path, "/api/players/") {
+        let id = http_util.sub(path, len("/api/players/"), len(path))
+        let p = players.get(store, id)
+        return http_util.write_json(conn, 200, p)
+    }
+
+    if http_util.path_starts_with(path, "/api/teams/") {
+        let id = http_util.sub(path, len("/api/teams/"), len(path))
+        let t = teams.get(store, id)
+        return http_util.write_json(conn, 200, t)
+    }
+
+    if http_util.path_starts_with(path, "/api/predict/") {
+        let id = http_util.sub(path, len("/api/predict/"), len(path))
+        let p = players.get(store, id)
+        let opts = server.predict_options_from_query(req["query"])
+        let result = predict.project(p["game_log"], opts)
+        return http_util.write_json(conn, 200, result)
+    }
+
+    if path == "/api/compare" {
+        let q = req["query"]
+        let a = q["a"] ?? ""
+        let b = q["b"] ?? ""
+        if a == "" or b == "" {
+            return http_util.write_json(conn, 400, { "error": "missing 'a' or 'b' query param" })
+        }
+        let opts = { "stat": q["stat"] ?? "PRA" }
+        return http_util.write_json(conn, 200, cmp.compare(store, a, b, opts))
+    }
+
+    if path == "/api/search" {
+        let q = req["query"]["q"] ?? ""
+        if q == "" {
+            return http_util.write_json(conn, 400, { "error": "missing 'q' query param" })
+        }
+        return http_util.write_json(conn, 200, search.run(store, q))
+    }
+
+    if path == "/api/live" {
+        try { live.poll(live_state) } catch (e) { log.warn(`live.poll: ${e}`) }
+        return http_util.write_json(conn, 200, {
+            "scoreboard": live_state["scoreboard"],
+            "games":      live_state["games"],
+            "last_poll":  live_state["last_poll_ms"]
+        })
+    }
+
+    if http_util.path_starts_with(path, "/api/live/") {
+        try { live.poll(live_state) } catch (e) { log.warn(`live.poll: ${e}`) }
+        let id = http_util.sub(path, len("/api/live/"), len(path))
+        let g = live_state["games"][id]
+        if g == nil { return http_util.write_json(conn, 404, { "error": "no live game with that id" }) }
+        return http_util.write_json(conn, 200, g)
+    }
+
+    http_util.write_json(conn, 404, { "error": `no route for ${path}` })
+}
+
+fn predict_options_from_query(q) {
+    {
+        "stat":               q["stat"] ?? "PRA",
+        "min_minutes":        int(q["min"] ?? "0"),
+        "exclude_garbage":    (q["garbage"] ?? "include") == "exclude",
+        "venue":              q["venue"] ?? "any",
+        "outcome":            q["outcome"] ?? "any",
+        "opponent_def_rating": float(q["opp_drtg"] ?? "113"),
+        "rest_days":           int(q["rest"] ?? "1"),
+        "pace_mode":           q["pace"] ?? "raw"
+    }
+}
+
+fn serve_static(conn, config, name) {
+    let path = `${config["web_dir"]}/${name}`
+    if not fs.exists(path) {
+        return http_util.write_text(conn, 404, `static not found: ${name}`)
+    }
+    let body = fs.read(path)
+    let dot = server.last_dot(name)
+    let ext = if dot < 0 { "" } else { http_util.sub(name, dot, len(name)) }
+    http_util.write_static(conn, body, http_util.ext_to_mime(ext))
+}
+
+fn last_dot(s) {
+    let mut i = len(s) - 1
+    while i >= 0 {
+        if s[i] == "." { return i }
+        i = i - 1
+    }
+    -1
+}

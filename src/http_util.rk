@@ -1,0 +1,168 @@
+fn read_request(conn) {
+    let buf = net.read(conn, 65535)
+    if buf == nil or buf == "" { return nil }
+    let head_end = http_util.find_substring(buf, "\r\n\r\n")
+    let head = if head_end < 0 { buf } else { http_util.sub(buf, 0, head_end) }
+    let body = if head_end < 0 { "" } else { http_util.sub(buf, head_end + 4, len(buf)) }
+    let lines = strs.split(head, "\r\n")
+    if len(lines) == 0 { return nil }
+    let first = strs.split(lines[0], " ")
+    if len(first) < 3 { return nil }
+    let path_full = first[1]
+    let qmark = http_util.find_substring(path_full, "?")
+    let path  = if qmark < 0 { path_full } else { http_util.sub(path_full, 0, qmark) }
+    let query = if qmark < 0 { "" } else { http_util.sub(path_full, qmark + 1, len(path_full)) }
+    let headers = http_util.parse_headers(lines)
+    {
+        "method": first[0],
+        "path":   path,
+        "query":  http_util.parse_query(query),
+        "version": first[2],
+        "headers": headers,
+        "body":    body
+    }
+}
+
+fn parse_headers(lines) {
+    let mut h = {}
+    let mut i = 1
+    while i < len(lines) {
+        let line = lines[i]
+        if line == "" { break }
+        let colon = http_util.find_substring(line, ":")
+        if colon > 0 {
+            let k = strs.lower(strs.trim(http_util.sub(line, 0, colon)))
+            let v = strs.trim(http_util.sub(line, colon + 1, len(line)))
+            h[k] = v
+        }
+        i = i + 1
+    }
+    h
+}
+
+fn parse_query(qs) {
+    let mut params = {}
+    if qs == "" { return params }
+    let pairs = strs.split(qs, "&")
+    for pair in pairs {
+        let eq = http_util.find_substring(pair, "=")
+        if eq < 0 {
+            params[http_util.url_decode(pair)] = ""
+        } else {
+            let k = http_util.url_decode(http_util.sub(pair, 0, eq))
+            let v = http_util.url_decode(http_util.sub(pair, eq + 1, len(pair)))
+            params[k] = v
+        }
+    }
+    params
+}
+
+fn url_decode(s) {
+    let mut out = ""
+    let mut i = 0
+    while i < len(s) {
+        let c = s[i]
+        if c == "+" { out = out + " "; i = i + 1 }
+        else if c == "%" and i + 2 < len(s) {
+            let hh = http_util.sub(s, i + 1, i + 3)
+            out = out + http_util.decode_hex(hh)
+            i = i + 3
+        } else { out = out + c; i = i + 1 }
+    }
+    out
+}
+
+fn decode_hex(hh) {
+    try {
+        let bytes = hex.decode(hh)
+        return bytes
+    } catch (e) {
+        return ""
+    }
+}
+
+fn write_response(conn, status, body, content_type) {
+    let status_text = http_util.status_phrase(status)
+    let head = `HTTP/1.1 ${status} ${status_text}\r\nContent-Type: ${content_type}\r\nContent-Length: ${len(body)}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n`
+    net.write(conn, head + body)
+}
+
+fn write_json(conn, status, value) {
+    http_util.write_response(conn, status, json.stringify(value), "application/json; charset=utf-8")
+}
+
+fn write_text(conn, status, body) {
+    http_util.write_response(conn, status, body, "text/plain; charset=utf-8")
+}
+
+fn write_html(conn, body) {
+    http_util.write_response(conn, 200, body, "text/html; charset=utf-8")
+}
+
+fn write_static(conn, body, content_type) {
+    http_util.write_response(conn, 200, body, content_type)
+}
+
+fn status_phrase(code) {
+    if code == 200 { "OK" }
+    else if code == 201 { "Created" }
+    else if code == 204 { "No Content" }
+    else if code == 301 { "Moved Permanently" }
+    else if code == 302 { "Found" }
+    else if code == 304 { "Not Modified" }
+    else if code == 400 { "Bad Request" }
+    else if code == 401 { "Unauthorized" }
+    else if code == 403 { "Forbidden" }
+    else if code == 404 { "Not Found" }
+    else if code == 500 { "Internal Server Error" }
+    else { "OK" }
+}
+
+fn find_substring(s, needle) {
+    let n = len(needle)
+    if n == 0 { return 0 }
+    let h = len(s)
+    if n > h { return -1 }
+    let mut i = 0
+    while i + n <= h {
+        let mut k = 0
+        let mut ok = true
+        while k < n {
+            if s[i + k] != needle[k] { ok = false; break }
+            k = k + 1
+        }
+        if ok { return i }
+        i = i + 1
+    }
+    -1
+}
+
+fn sub(s, a, b) {
+    let mut out = ""
+    let mut i = a
+    while i < b and i < len(s) { out = out + s[i]; i = i + 1 }
+    out
+}
+
+fn ext_to_mime(ext) {
+    if ext == ".html" { "text/html; charset=utf-8" }
+    else if ext == ".css" { "text/css; charset=utf-8" }
+    else if ext == ".js"  { "application/javascript; charset=utf-8" }
+    else if ext == ".json"{ "application/json; charset=utf-8" }
+    else if ext == ".svg" { "image/svg+xml" }
+    else if ext == ".png" { "image/png" }
+    else if ext == ".ico" { "image/x-icon" }
+    else { "application/octet-stream" }
+}
+
+fn path_starts_with(path, prefix) {
+    if len(path) < len(prefix) { return false }
+    http_util.sub(path, 0, len(prefix)) == prefix
+}
+
+fn path_segments(path) {
+    let parts = strs.split(path, "/")
+    let mut out = []
+    for p in parts { if p != "" { push(out, p) } }
+    out
+}

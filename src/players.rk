@@ -1,0 +1,138 @@
+import "log.rk" as log
+import "db.rk" as db
+import "normalize.rk" as norm
+import "sources/nba_official.rk" as nba
+import "sources/basketball_ref.rk" as bref
+import "sources/bball_index.rk" as bbi
+import "sources/dunks_and_threes.rk" as dt
+import "sources/pbp_stats.rk" as pbp
+import "sources/nba_savant.rk" as savant
+
+
+fn get(store, player_id) {
+    let cache_key = `player:${player_id}`
+    let cached = db.cache_get(store, cache_key, 300_000)
+    if cached != nil { return cached }
+
+    let snap = db.load_snapshot(store, "player", player_id)
+    let mut p = if snap != nil { snap } else { norm.empty_player() }
+    p["id"] = player_id
+
+    p = players.enrich_from_nba(p, player_id)
+    p = players.enrich_from_bref(p, player_id)
+    p = players.enrich_from_bbi(p, player_id)
+    p = players.enrich_from_dt(p, player_id)
+    p = players.enrich_from_pbp(p, player_id)
+    p = players.enrich_from_savant(p, player_id)
+
+    db.save_snapshot(store, "player", player_id, p)
+    db.cache_put(store, cache_key, p)
+    p
+}
+
+fn enrich_from_nba(player, player_id) {
+    let data_ = nba.player_profile(player_id)
+    if data_ == nil { return player }
+    let head = players.first_row(data_)
+    norm.merge_traditional(player, "nba_official", head)
+    norm.merge_advanced(player, "nba_official", head)
+    player
+}
+
+fn enrich_from_bref(player, player_id) {
+    let career = bref.player_career(player_id)
+    if career == nil { return player }
+    let pg = career["per_game"]
+    let adv = career["advanced"]
+    let pg_payload = players.bref_row_to_map(if len(pg) > 0 { pg[len(pg) - 1] } else { [] }, "per_game")
+    let adv_payload = players.bref_row_to_map(if len(adv) > 0 { adv[len(adv) - 1] } else { [] }, "advanced")
+    norm.merge_traditional(player, "basketball_ref", pg_payload)
+    norm.merge_advanced(player, "basketball_ref", adv_payload)
+    player
+}
+
+fn enrich_from_bbi(player, player_id) {
+    let grades = bbi.role_grades(player_id)
+    if grades == nil { return player }
+    norm.record_source(player, "bball_index")
+    player["defense"]["perimeter_grade"] = grades["perimeter_defense"]
+    player["defense"]["interior_grade"]  = grades["interior_defense"]
+    player["defense"]["matchup_difficulty"] = grades["matchup_difficulty"]
+    player
+}
+
+fn enrich_from_dt(player, player_id) {
+    let r = dt.player_epm(player_id)
+    if r == nil { return player }
+    norm.merge_advanced(player, "dunks_and_threes", {
+        "epm": r["epm"],
+        "off_epm": r["off_epm"],
+        "def_epm": r["def_epm"]
+    })
+    player
+}
+
+fn enrich_from_pbp(player, player_id) {
+    let q = pbp.shot_quality(player_id, "2025-26")
+    let lc = pbp.late_clock(player_id, "2025-26")
+    norm.record_source(player, "pbp_stats")
+    if q != nil { player["pbp_derived"]["shot_quality"] = q }
+    if lc != nil { player["pbp_derived"]["late_clock_efficiency"] = lc }
+    player
+}
+
+fn enrich_from_savant(player, player_id) {
+    let chart = savant.shot_chart(player_id, "2025-26")
+    if chart == nil { return player }
+    norm.record_source(player, "nba_savant")
+    player["shooting_zones"] = chart["zones"]
+    player
+}
+
+fn first_row(data_) {
+    if data_ == nil { return {} }
+    if has(data_, "raw") {
+        let r = data_["raw"]
+        if has(r, "resultSets") {
+            let sets = r["resultSets"]
+            if len(sets) > 0 {
+                let first = sets[0]
+                let headers = first["headers"]
+                let rows = first["rowSet"]
+                if len(rows) > 0 {
+                    let mut out = {}
+                    let row = rows[0]
+                    let mut i = 0
+                    while i < len(headers) and i < len(row) {
+                        out[headers[i]] = row[i]
+                        i = i + 1
+                    }
+                    return out
+                }
+            }
+        }
+    }
+    {}
+}
+
+fn bref_row_to_map(row, kind) {
+    if len(row) == 0 { return {} }
+    let pg_cols  = ["G","MP","FG","FGA","FG_PCT","FG3","FG3A","FG3_PCT","FT","FTA","FT_PCT","TRB","AST","STL","BLK","TOV","PF","PTS"]
+    let adv_cols = ["G","MP","PER","TS_PCT","USG_PCT","OBPM","DBPM","BPM","VORP","WS","WS_48"]
+    let cols = if kind == "per_game" { pg_cols } else { adv_cols }
+    let mut out = {}
+    let mut i = 0
+    let start = if len(row) > len(cols) { len(row) - len(cols) } else { 0 }
+    while i < len(cols) and start + i < len(row) {
+        let v = row[start + i]
+        out[cols[i]] = players.try_float(v)
+        i = i + 1
+    }
+    out
+}
+
+fn try_float(s) {
+    if s == nil { return nil }
+    if s == "" { return nil }
+    try { return float(s) } catch (e) { return s }
+}

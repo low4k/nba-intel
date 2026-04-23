@@ -1,0 +1,86 @@
+import "log.rk" as log
+import "db.rk" as db
+import "sources/basketball_ref.rk" as bref
+import "sources/cleaning_the_glass.rk" as ctg
+import "sources/nba_official.rk" as nba
+
+
+fn empty_team() {
+    {
+        "id": "",
+        "name": "",
+        "season": "",
+        "roster": [],
+        "ratings": {
+            "off_rating": nil,
+            "def_rating": nil,
+            "net_rating": nil,
+            "pace": nil
+        },
+        "splits": {
+            "home": {}, "away": {}, "last_5": {}, "last_10": {}
+        },
+        "shot_distribution": {
+            "rim": nil, "midrange": nil, "corner_3": nil, "above_break_3": nil
+        },
+        "lineups": [],
+        "schedule_strength": nil,
+        "net_rating_trend": [],
+        "sources_used": []
+    }
+}
+
+fn get(store, team_id) {
+    let key = `team:${team_id}`
+    let cached = db.cache_get(store, key, 300_000)
+    if cached != nil { return cached }
+
+    let mut t = teams.empty_team()
+    t["id"] = team_id
+    t = teams.enrich_from_bref(t, team_id)
+    t = teams.enrich_from_ctg(t, team_id)
+
+    db.save_snapshot(store, "team", team_id, t)
+    db.cache_put(store, key, t)
+    t
+}
+
+fn enrich_from_bref(team, team_id) {
+    let parts = teams.parse_team_id(team_id)
+    let season = bref.team_season(parts["abbr"], parts["year"])
+    if season == nil { return team }
+    teams.record_source(team, "basketball_ref")
+    team["roster"] = season["roster"]
+    team["name"] = parts["abbr"]
+    team["season"] = parts["year"]
+    team
+}
+
+fn enrich_from_ctg(team, team_id) {
+    let parts = teams.parse_team_id(team_id)
+    let eff = ctg.team_efficiency(parts["abbr"])
+    if eff == nil { return team }
+    teams.record_source(team, "cleaning_the_glass")
+    team["ratings"]["off_rating"] = eff["off_rating"]
+    team["ratings"]["def_rating"] = eff["def_rating"]
+    team["ratings"]["net_rating"] = eff["net_rating"]
+    team["ratings"]["pace"] = eff["pace"]
+    team
+}
+
+fn parse_team_id(id) {
+    let parts = strs.split(id, "-")
+    if len(parts) >= 2 {
+        { "abbr": parts[0], "year": parts[1] }
+    } else {
+        { "abbr": id, "year": "2026" }
+    }
+}
+
+fn record_source(team, name) {
+    for s in team["sources_used"] {
+        if s == name { return team }
+    }
+    push(team["sources_used"], name)
+    team
+}

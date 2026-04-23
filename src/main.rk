@@ -1,0 +1,36 @@
+import "log.rk" as log
+import "config.rk" as cfg
+import "db.rk" as db
+import "http_util.rk" as http_util
+import "normalize.rk" as norm
+import "glossary.rk" as gloss
+import "sources/nba_official.rk" as nba
+import "sources/basketball_ref.rk" as bref
+import "sources/bball_index.rk" as bbi
+import "sources/dunks_and_threes.rk" as dt
+import "sources/pbp_stats.rk" as pbp
+import "sources/nba_savant.rk" as savant
+import "sources/cleaning_the_glass.rk" as ctg
+import "sources/statmuse.rk" as muse
+import "players.rk" as players
+import "teams.rk" as teams
+import "predict.rk" as predict
+import "compare.rk" as cmp
+import "search.rk" as search
+import "live.rk" as live
+import "server.rk" as server
+
+fn main() {
+    let config = cfg.default_config()
+    if not fs.exists(config["data_dir"]) {
+        fs.write(`${config["data_dir"]}/.keep`, "")
+    }
+    let store = db.new_store(config["data_dir"])
+    let live_state = live.live_state()
+
+    log.info("nba-intel starting")
+    log.info(`data dir: ${config["data_dir"]}`)
+    log.info(`web dir:  ${config["web_dir"]}`)
+
+    server.serve(config, store, live_state)
+}

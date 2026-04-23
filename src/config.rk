@@ -1,0 +1,25 @@
+fn default_config() {
+    {
+        "host": "127.0.0.1",
+        "port": 7878,
+        "data_dir": "./data",
+        "web_dir": "./src/web",
+        "cache_ttl_seconds": 300,
+        "live_poll_seconds": 5,
+        "request_timeout_seconds": 8,
+        "user_agent": "nba-intel/0.1 (rock)"
+    }
+}
+
+fn source_endpoints() {
+    {
+        "nba_official":        "https://stats.nba.com/stats",
+        "basketball_ref":      "https://www.basketball-reference.com",
+        "statmuse":            "https://www.statmuse.com",
+        "bball_index":         "https://www.bball-index.com",
+        "cleaning_the_glass":  "https://cleaningtheglass.com",
+        "dunks_and_threes":    "https://dunksandthrees.com",
+        "pbp_stats":           "https://www.pbpstats.com",
+        "nba_savant":          "https://nbasavant.com"
+    }
+}

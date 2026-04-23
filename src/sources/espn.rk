@@ -1,0 +1,126 @@
+import "../log.rk" as log
+
+fn scoreboard() {
+    let url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
+    try {
+        let resp = http.get(url)
+        if resp["status"] != 200 { return nil }
+        return json.parse(resp["body"])
+    } catch (e) {
+        log.warn(`espn scoreboard: ${e}`)
+        return nil
+    }
+}
+
+fn all_teams() {
+    let url = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams"
+    try {
+        let resp = http.get(url)
+        if resp["status"] != 200 { return nil }
+        return json.parse(resp["body"])
+    } catch (e) {
+        log.warn(`espn teams: ${e}`)
+        return nil
+    }
+}
+
+fn team_roster(team_abbr) {
+    let url = `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${strs.lower(team_abbr)}/roster`
+    try {
+        let resp = http.get(url)
+        if resp["status"] != 200 { return nil }
+        return json.parse(resp["body"])
+    } catch (e) {
+        log.warn(`espn roster ${team_abbr}: ${e}`)
+        return nil
+    }
+}
+
+fn standings() {
+    let url = "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings"
+    try {
+        let resp = http.get(url)
+        if resp["status"] != 200 { return nil }
+        return json.parse(resp["body"])
+    } catch (e) {
+        log.warn(`espn standings: ${e}`)
+        return nil
+    }
+}
+
+fn player_overview(player_id) {
+    let url = `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${player_id}`
+    try {
+        let resp = http.get(url)
+        if resp["status"] != 200 { return nil }
+        return json.parse(resp["body"])
+    } catch (e) {
+        log.warn(`espn player ${player_id}: ${e}`)
+        return nil
+    }
+}
+
+fn player_stats(player_id) {
+    let url = `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${player_id}/overview`
+    try {
+        let resp = http.get(url)
+        if resp["status"] != 200 { return nil }
+        return json.parse(resp["body"])
+    } catch (e) {
+        log.warn(`espn player stats ${player_id}: ${e}`)
+        return nil
+    }
+}
+
+fn player_gamelog(player_id) {
+    let url = `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${player_id}/gamelog`
+    try {
+        let resp = http.get(url)
+        if resp["status"] != 200 { return nil }
+        return json.parse(resp["body"])
+    } catch (e) {
+        log.warn(`espn gamelog ${player_id}: ${e}`)
+        return nil
+    }
+}
+
+fn player_bio(player_id) {
+    let url = `https://site.web.api.espn.com/apis/common/v3/sports/basketball/nba/athletes/${player_id}/bio`
+    try {
+        let resp = http.get(url)
+        if resp["status"] != 200 { return nil }
+        return json.parse(resp["body"])
+    } catch (e) {
+        return nil
+    }
+}
+
+fn search_players(query) {
+    let q = espn.urlenc(query)
+    let url = `https://site.web.api.espn.com/apis/common/v3/search?limit=10&query=${q}&type=player`
+    try {
+        let resp = http.get(url)
+        if resp["status"] != 200 { return nil }
+        return json.parse(resp["body"])
+    } catch (e) {
+        log.warn(`espn search: ${e}`)
+        return nil
+    }
+}
+
+fn urlenc(s) {
+    let mut out = ""
+    let mut i = 0
+    while i < len(s) {
+        let c = s[i]
+        if (c >= "a" and c <= "z") or (c >= "A" and c <= "Z") or (c >= "0" and c <= "9") or c == "-" or c == "_" or c == "." or c == "~" {
+            out = out + c
+        } else if c == " " {
+            out = out + "%20"
+        } else {
+            out = out + "%" + hex.encode(c)
+        }
+        i = i + 1
+    }
+    out
+}

@@ -1,4 +1,5 @@
 import "sources/statmuse.rk" as muse
+import "sources/espn.rk" as espn
 
 fn parse(query) {
     let q = strs.lower(strs.trim(query))
@@ -17,11 +18,36 @@ fn parse(query) {
 
 fn run(store, query) {
     let parsed = search.parse(query)
-    let muse_result = muse.ask(query)
+    let espn_result = search.espn_players(query)
+    let muse_result = nil
     {
         "parsed": parsed,
+        "players": espn_result,
         "statmuse": muse_result
     }
+}
+
+fn espn_players(query) {
+    let r = espn.search_players(query)
+    if r == nil { return [] }
+    let mut hits = []
+    let items = r["items"] ?? []
+    for c in items {
+        let kind = c["type"] ?? ""
+        if kind != "player" and kind != "athlete" { continue }
+        let img_v = c["image"]
+        let img = ""
+        if type_of(img_v) == "map" { img = img_v["href"] ?? "" }
+        else if type_of(img_v) == "str" { img = img_v }
+        push(hits, {
+            "id":       c["id"] ?? (c["uid"] ?? ""),
+            "name":     c["displayName"] ?? (c["name"] ?? ""),
+            "team":     c["defaultTeam"] ?? (c["subheadline"] ?? ""),
+            "position": c["defaultPosition"] ?? (c["position"] ?? ""),
+            "headshot": img
+        })
+    }
+    hits
 }
 
 fn detect_intent(q) {

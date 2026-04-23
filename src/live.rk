@@ -1,6 +1,5 @@
 import "log.rk" as log
-import "db.rk" as db
-import "sources/nba_official.rk" as nba
+import "sources/espn.rk" as espn
 
 fn live_state() {
     {
@@ -12,90 +11,99 @@ fn live_state() {
 }
 
 fn poll(state) {
-    let board = nba.live_scoreboard()
-    state["scoreboard"] = board
+    let board = espn.scoreboard()
     state["last_poll_ms"] = time.now_ms()
-    let games = live.extract_games(board)
-    for g in games {
-        let id = g["gameId"] ?? g["game_id"] ?? ""
-        if id != "" {
-            state["games"][id] = live.enrich_game(g)
-        }
+    if board == nil {
+        state["scoreboard"] = []
+        return state
     }
-    live.notify_subscribers(state)
+    let events = board["events"] ?? []
+    let mut simplified = []
+    for ev in events {
+        let g = live.extract_game(ev)
+        if g == nil { continue }
+        push(simplified, g)
+        state["games"][g["game_id"]] = g
+    }
+    state["scoreboard"] = simplified
     state
 }
 
-fn enrich_game(g) {
-    let home = g["homeTeam"] ?? {}
-    let away = g["awayTeam"] ?? {}
-    {
-        "game_id":    g["gameId"] ?? "",
-        "status":     g["gameStatusText"] ?? "",
-        "period":     g["period"] ?? 0,
-        "clock":      g["gameClock"] ?? "",
-        "home": {
-            "team":  home["teamTricode"] ?? "",
-            "score": home["score"] ?? 0
-        },
-        "away": {
-            "team":  away["teamTricode"] ?? "",
-            "score": away["score"] ?? 0
-        },
-        "win_probability": live.estimate_win_prob(g),
-        "pace_estimate":   live.estimate_pace(g),
-        "milestones":      live.detect_milestones(g)
-    }
-}
-
-fn extract_games(board) {
-    if board == nil { return [] }
-    if has(board, "scoreboard") {
-        let sb = board["scoreboard"]
-        if has(sb, "games") { return sb["games"] }
-    }
-    if has(board, "games") { return board["games"] }
-    return []
-}
-
-fn estimate_win_prob(g) {
-    let home = g["homeTeam"] ?? {}
-    let away = g["awayTeam"] ?? {}
-    let h = home["score"] ?? 0
-    let a = away["score"] ?? 0
-    let period = g["period"] ?? 1
-    let diff = float(h - a)
-    let elapsed = float(period) / 4.0
-    let weight = 0.5 + elapsed * 0.5
-    let data_ = 0.5 + (diff / 30.0) * weight
-    if data_ < 0.01 { 0.01 } else if data_ > 0.99 { 0.99 } else { data_ }
-}
-
-fn estimate_pace(g) {
-    let home = g["homeTeam"] ?? {}
-    let away = g["awayTeam"] ?? {}
-    let total = (home["score"] ?? 0) + (away["score"] ?? 0)
-    let period = g["period"] ?? 1
-    if period <= 0 { 0.0 } else { float(total) / float(period) * 4.0 }
-}
-
-fn detect_milestones(g) {
-    let mut hits = []
-    let teams = [g["homeTeam"] ?? {}, g["awayTeam"] ?? {}]
-    for t in teams {
-        let players = t["players"] ?? []
-        for p in players {
-            let pts = p["statistics"] ?? {}
-            let scored = pts["points"] ?? 0
-            if scored >= 30 { push(hits, { "kind": "30pt_game", "player": p["name"] ?? "" }) }
-            if scored >= 50 { push(hits, { "kind": "50pt_game", "player": p["name"] ?? "" }) }
-            let r = pts["reboundsTotal"] ?? 0
-            let a = pts["assists"] ?? 0
-            if scored >= 10 and r >= 10 and a >= 10 {
-                push(hits, { "kind": "triple_double", "player": p["name"] ?? "" })
-            }
+fn extract_game(ev) {
+    let comps = ev["competitions"] ?? []
+    if len(comps) == 0 { return nil }
+    let c = comps[0]
+    let competitors = c["competitors"] ?? []
+    if len(competitors) < 2 { return nil }
+    let mut home = {}
+    let mut away = {}
+    for comp in competitors {
+        let side = comp["homeAway"] ?? ""
+        let simplified = {
+            "team":    ((comp["team"] ?? {})["abbreviation"]) ?? "",
+            "name":    ((comp["team"] ?? {})["displayName"]) ?? "",
+            "logo":    ((comp["team"] ?? {})["logo"]) ?? "",
+            "score":   live.num(comp["score"]) ?? 0,
+            "record":  live.record_str(comp["records"] ?? [])
         }
+        if side == "home" { home = simplified }
+        else { away = simplified }
     }
+    let status = c["status"] ?? {}
+    let stype = status["type"] ?? {}
+    let period = status["period"] ?? 0
+    let clock = status["displayClock"] ?? ""
+    let win_prob = live.estimate_win_prob(home["score"], away["score"], period, stype["state"] ?? "")
+    {
+        "game_id": ev["id"] ?? "",
+        "date":    ev["date"] ?? "",
+        "name":    ev["shortName"] ?? "",
+        "status":  stype["description"] ?? "",
+        "state":   stype["state"] ?? "pre",
+        "completed": stype["completed"] ?? false,
+        "period":  period,
+        "clock":   clock,
+        "home":    home,
+        "away":    away,
+        "win_probability_home": win_prob,
+        "pace_estimate": live.estimate_pace(home["score"], away["score"], period),
+        "milestones": live.detect_milestones(home, away)
+    }
+}
+
+fn record_str(records) {
+    if records == nil or len(records) == 0 { return "" }
+    (records[0])["summary"] ?? ""
+}
+
+fn num(v) {
+    if v == nil or v == "" { return nil }
+    try { return float(v) } catch (e) { return nil }
+}
+
+fn estimate_win_prob(h, a, period, game_state) {
+    if game_state == "pre" { return 0.5 }
+    if game_state == "post" { return if h > a { 1.0 } else { 0.0 } }
+    let diff = float(h - a)
+    let elapsed = if period > 0 { float(period) / 4.0 } else { 0.1 }
+    let weight = 0.5 + elapsed * 0.5
+    let raw_wp = 0.5 + (diff / 30.0) * weight
+    if raw_wp < 0.01 { 0.01 } else if raw_wp > 0.99 { 0.99 } else { raw_wp }
+}
+
+fn estimate_pace(h, a, period) {
+    let total = h + a
+    if period <= 0 { return 0.0 }
+    float(total) / float(period) * 4.0
+}
+
+fn detect_milestones(home, away) {
+    let mut hits = []
+    if (home["score"] ?? 0) >= 130 { push(hits, { "kind": "high_scoring", "side": "home" }) }
+    if (away["score"] ?? 0) >= 130 { push(hits, { "kind": "high_scoring", "side": "away" }) }
+    let diff = (home["score"] ?? 0) - (away["score"] ?? 0)
+    if diff >= 25 { push(hits, { "kind": "blowout", "side": "home" }) }
+    if diff <= -25 { push(hits, { "kind": "blowout", "side": "away" }) }
     hits
 }
 
@@ -105,13 +113,6 @@ fn subscribe(state, callback) {
 
 fn notify_subscribers(state) {
     for cb in state["subscribers"] {
-        try { cb(state) } catch (e) { log.warn(`subscriber failed: ${e}`) }
-    }
-}
-
-fn poll_loop(state, interval_seconds) {
-    loop {
-        try { live.poll(state) } catch (e) { log.error(`live poll: ${e}`) }
-        time.sleep_ms(interval_seconds * 1000)
+        try { cb(state) } catch (e) { log.warn(`subscriber: ${e}`) }
     }
 }

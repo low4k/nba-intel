@@ -1,3 +1,7 @@
 .cache/
 *.log
 /tmp/
+data/player_*.json
+data/team_*.json
+data/cache/
+data/snapshots/

@@ -1,7 +1,20 @@
 fn default_config() {
+    let port_env = os.get_env("PORT") ?? ""
+    let mut port_val = 7878
+    if port_env != "" {
+        try {
+            port_val = int(port_env)
+        } catch (e) {
+            port_val = 7878
+        }
+    }
+    let host_env = os.get_env("HOST") ?? ""
+    let mut host_val = "127.0.0.1"
+    if host_env != "" { host_val = host_env }
+    else if port_env != "" { host_val = "0.0.0.0" }
     {
-        "host": "127.0.0.1",
-        "port": 7878,
+        "host": host_val,
+        "port": port_val,
         "data_dir": "./data",
         "web_dir": "./src/web",
         "cache_ttl_seconds": 300,

@@ -1,31 +1,24 @@
 import "log.rk" as log
 import "db.rk" as db
-import "sources/basketball_ref.rk" as bref
-import "sources/cleaning_the_glass.rk" as ctg
-import "sources/nba_official.rk" as nba
-
+import "sources/espn.rk" as espn
 
 fn empty_team() {
     {
         "id": "",
         "name": "",
+        "abbr": "",
+        "logo": "",
         "season": "",
         "roster": [],
+        "record": "",
+        "standing": nil,
         "ratings": {
             "off_rating": nil,
             "def_rating": nil,
             "net_rating": nil,
             "pace": nil
         },
-        "splits": {
-            "home": {}, "away": {}, "last_5": {}, "last_10": {}
-        },
-        "shot_distribution": {
-            "rim": nil, "midrange": nil, "corner_3": nil, "above_break_3": nil
-        },
-        "lineups": [],
-        "schedule_strength": nil,
-        "net_rating_trend": [],
+        "splits": { "home": {}, "away": {}, "last_5": {}, "last_10": {} },
         "sources_used": []
     }
 }
@@ -37,35 +30,48 @@ fn get(store, team_id) {
 
     let mut t = teams.empty_team()
     t["id"] = team_id
-    t = teams.enrich_from_bref(t, team_id)
-    t = teams.enrich_from_ctg(t, team_id)
+    let parts = teams.parse_team_id(team_id)
+    t["abbr"] = parts["abbr"]
+    t["season"] = parts["year"]
+
+    t = teams.enrich_from_espn(t, parts["abbr"])
 
     db.save_snapshot(store, "team", team_id, t)
     db.cache_put(store, key, t)
     t
 }
 
-fn enrich_from_bref(team, team_id) {
-    let parts = teams.parse_team_id(team_id)
-    let season = bref.team_season(parts["abbr"], parts["year"])
-    if season == nil { return team }
-    teams.record_source(team, "basketball_ref")
-    team["roster"] = season["roster"]
-    team["name"] = parts["abbr"]
-    team["season"] = parts["year"]
+fn enrich_from_espn(team, abbr) {
+    let data_ = espn.team_roster(abbr)
+    if data_ == nil { return team }
+    teams.record_source(team, "espn")
+    let info = data_["team"] ?? {}
+    team["name"] = info["displayName"] ?? team["name"]
+    team["logo"] = (info["logo"] ?? "")
+    team["record"] = teams.record_str(info["recordSummary"] ?? "")
+
+    let athletes = data_["athletes"] ?? []
+    let mut roster = []
+    for a in athletes {
+        let pos = (a["position"] ?? {})["abbreviation"] ?? ""
+        push(roster, {
+            "id":       a["id"] ?? "",
+            "name":     a["displayName"] ?? "",
+            "position": pos,
+            "jersey":   a["jersey"] ?? "",
+            "age":      a["age"] ?? 0,
+            "height":   a["displayHeight"] ?? "",
+            "weight":   a["displayWeight"] ?? "",
+            "headshot": (a["headshot"] ?? {})["href"] ?? ""
+        })
+    }
+    team["roster"] = roster
     team
 }
 
-fn enrich_from_ctg(team, team_id) {
-    let parts = teams.parse_team_id(team_id)
-    let eff = ctg.team_efficiency(parts["abbr"])
-    if eff == nil { return team }
-    teams.record_source(team, "cleaning_the_glass")
-    team["ratings"]["off_rating"] = eff["off_rating"]
-    team["ratings"]["def_rating"] = eff["def_rating"]
-    team["ratings"]["net_rating"] = eff["net_rating"]
-    team["ratings"]["pace"] = eff["pace"]
-    team
+fn record_str(v) {
+    if v == nil { return "" }
+    v
 }
 
 fn parse_team_id(id) {

@@ -1,0 +1,9 @@
+# .dockerignore
+.git
+.gitignore
+.directory
+data/cache
+data/snapshots
+*.log
+/tmp
+.cache

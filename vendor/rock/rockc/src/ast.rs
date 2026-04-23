@@ -195,6 +195,7 @@ pub enum Expr {
     Raw(Block),
     Comptime(Box<Expr>, Span),
     Try(Box<Expr>, Span),
+    TryCatch { try_body: Block, err_name: String, catch_body: Block, span: Span },
     Await(Box<Expr>, Span),
 }
 
@@ -256,6 +257,7 @@ impl Expr {
             | Expr::DefaultOr { span, .. } | Expr::Pipe { span, .. } => *span,
             Expr::Spawn(_, s) | Expr::Comptime(_, s)
             | Expr::Try(_, s) | Expr::Await(_, s) => *s,
+            Expr::TryCatch { span, .. } => *span,
             Expr::Raw(b) => b.span,
         }
     }

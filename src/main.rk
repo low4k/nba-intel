@@ -1,4 +1,3 @@
-import "log.rk" as log
 import "config.rk" as cfg
 import "db.rk" as db
 import "http_util.rk" as http_util

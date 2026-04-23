@@ -42,6 +42,10 @@ fn main() -> ExitCode {
 
     let result = match cmd {
         "run" => match args.get(1) {
+            Some(flag) if flag == "--watch" || flag == "-w" => match args.get(2) {
+                Some(path) => cmd_watch(path),
+                None => { print_help(); return ExitCode::from(2); }
+            },
             Some(path) => cmd_run(path),
             None => { print_help(); return ExitCode::from(2); }
         },
@@ -123,6 +127,26 @@ fn read_source(path: &str) -> Result<String, Box<dyn std::error::Error>> {
 fn cmd_run(path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let src = read_source(path)?;
     run_with_pretty(&src, path)
+}
+
+fn cmd_watch(path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    // Simple mtime-polling watcher. Re-runs whenever the file changes.
+    use std::time::{Duration, SystemTime};
+    let p = std::path::Path::new(path).to_path_buf();
+    eprintln!("rock run --watch: watching {}", p.display());
+    let mut last: Option<SystemTime> = None;
+    loop {
+        let cur = std::fs::metadata(&p).ok().and_then(|m| m.modified().ok());
+        if cur != last {
+            last = cur;
+            eprintln!("\x1b[2J\x1b[H--- rock run {} ---", p.display());
+            match read_source(path).and_then(|src| run_with_pretty(&src, path)) {
+                Ok(_) => eprintln!("--- ok ---"),
+                Err(e) => eprintln!("--- error: {} ---", e),
+            }
+        }
+        std::thread::sleep(Duration::from_millis(400));
+    }
 }
 
 fn run_with_pretty(src: &str, path: &str) -> Result<(), Box<dyn std::error::Error>> {

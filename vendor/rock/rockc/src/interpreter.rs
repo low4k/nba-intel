@@ -269,6 +269,122 @@ impl Interpreter {
         });
         env.borrow_mut().define("parse_bool", Value::Native(parse_bool_fn), false);
 
+        // ---- Result constructors and helpers (ok/err/is_ok/is_err/unwrap/unwrap_or) ----
+        fn mk_ok(v: Value) -> Value {
+            Value::Struct(Rc::new(RefCell::new(Struct {
+                type_name: "Ok".to_string(),
+                fields: vec![("value".to_string(), v)],
+            })))
+        }
+        fn mk_err(v: Value) -> Value {
+            Value::Struct(Rc::new(RefCell::new(Struct {
+                type_name: "Err".to_string(),
+                fields: vec![("message".to_string(), v)],
+            })))
+        }
+        let ok_fn: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(|args: &[Value]| {
+            if args.len() != 1 { return Err(RockError::runtime("ok() takes 1 argument")); }
+            Ok(mk_ok(args[0].clone()))
+        });
+        env.borrow_mut().define("ok", Value::Native(ok_fn), false);
+
+        let err_fn: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(|args: &[Value]| {
+            if args.len() != 1 { return Err(RockError::runtime("err() takes 1 argument")); }
+            Ok(mk_err(args[0].clone()))
+        });
+        env.borrow_mut().define("err", Value::Native(err_fn), false);
+
+        let is_ok_fn: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(|args: &[Value]| {
+            if args.len() != 1 { return Err(RockError::runtime("is_ok() takes 1 argument")); }
+            Ok(Value::Bool(matches!(&args[0], Value::Struct(s) if s.borrow().type_name == "Ok")))
+        });
+        env.borrow_mut().define("is_ok", Value::Native(is_ok_fn), false);
+
+        let is_err_fn: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(|args: &[Value]| {
+            if args.len() != 1 { return Err(RockError::runtime("is_err() takes 1 argument")); }
+            Ok(Value::Bool(matches!(&args[0], Value::Struct(s) if s.borrow().type_name == "Err")))
+        });
+        env.borrow_mut().define("is_err", Value::Native(is_err_fn), false);
+
+        let unwrap_fn: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(|args: &[Value]| {
+            if args.len() != 1 { return Err(RockError::runtime("unwrap() takes 1 argument")); }
+            match &args[0] {
+                Value::Struct(s) if s.borrow().type_name == "Ok" => {
+                    Ok(s.borrow().fields.iter().find(|(n,_)| n == "value").map(|(_,v)| v.clone()).unwrap_or(Value::Nil))
+                }
+                Value::Struct(s) if s.borrow().type_name == "Err" => {
+                    let msg = s.borrow().fields.iter().find(|(n,_)| n == "message").map(|(_,v)| v.to_string()).unwrap_or_else(|| "unwrap on Err".to_string());
+                    Err(RockError::runtime(format!("unwrap on Err: {}", msg)))
+                }
+                Value::Nil => Err(RockError::runtime("unwrap on nil")),
+                other => Ok(other.clone()),
+            }
+        });
+        env.borrow_mut().define("unwrap", Value::Native(unwrap_fn), false);
+
+        let unwrap_or_fn: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(|args: &[Value]| {
+            if args.len() != 2 { return Err(RockError::runtime("unwrap_or() takes 2 arguments")); }
+            match &args[0] {
+                Value::Struct(s) if s.borrow().type_name == "Ok" => {
+                    Ok(s.borrow().fields.iter().find(|(n,_)| n == "value").map(|(_,v)| v.clone()).unwrap_or(Value::Nil))
+                }
+                Value::Struct(s) if s.borrow().type_name == "Err" => Ok(args[1].clone()),
+                Value::Nil => Ok(args[1].clone()),
+                other => Ok(other.clone()),
+            }
+        });
+        env.borrow_mut().define("unwrap_or", Value::Native(unwrap_or_fn), false);
+
+        // ---- url encoding (percent-encoding, no deps) — exposed via `url.encode` / `url.decode`
+        //      to avoid shadowing user-defined url_encode/url_decode in modules that
+        //      predate this stdlib addition (e.g. nba-intel's http_util).
+        let url_encode_fn: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(|args: &[Value]| {
+            if args.len() != 1 { return Err(RockError::runtime("url.encode() takes 1 argument")); }
+            let s = match &args[0] {
+                Value::Str(s) => s.as_str().to_string(),
+                other => other.to_string(),
+            };
+            let mut out = String::with_capacity(s.len());
+            for b in s.bytes() {
+                match b {
+                    b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(b as char),
+                    _ => out.push_str(&format!("%{:02X}", b)),
+                }
+            }
+            Ok(Value::Str(Rc::new(out)))
+        });
+
+        let url_decode_fn: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(|args: &[Value]| {
+            if args.len() != 1 { return Err(RockError::runtime("url.decode() takes 1 argument")); }
+            let s = match &args[0] {
+                Value::Str(s) => s.as_str().to_string(),
+                other => other.to_string(),
+            };
+            let bytes = s.as_bytes();
+            let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+            let mut i = 0;
+            while i < bytes.len() {
+                let b = bytes[i];
+                if b == b'+' { out.push(b' '); i += 1; }
+                else if b == b'%' && i + 2 < bytes.len() {
+                    let hex = &s[i+1..i+3];
+                    match u8::from_str_radix(hex, 16) {
+                        Ok(v) => { out.push(v); i += 3; }
+                        Err(_) => { out.push(b); i += 1; }
+                    }
+                } else { out.push(b); i += 1; }
+            }
+            match String::from_utf8(out) {
+                Ok(s) => Ok(Value::Str(Rc::new(s))),
+                Err(_) => Ok(Value::Nil),
+            }
+        });
+        let url_mod = Value::Map(Rc::new(RefCell::new(vec![
+            (Value::Str(Rc::new("encode".to_string())), Value::Native(url_encode_fn)),
+            (Value::Str(Rc::new("decode".to_string())), Value::Native(url_decode_fn)),
+        ])));
+        env.borrow_mut().define("url", url_mod, false);
+
         let assert_fn: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(|args: &[Value]| {
             if args.is_empty() { return Err(RockError::runtime("assert() takes at least 1 argument")); }
             if !args[0].is_truthy() {
@@ -1431,6 +1547,94 @@ impl Interpreter {
         ]);
         env.borrow_mut().define("http", http_mod, false);
 
+        // ---- log module (structured JSON Lines to stderr) ----
+        fn log_emit(level: &str, args: &[Value]) -> Result<Value> {
+            // Build a tiny JSON object: {"ts":..,"level":..,"msg":..,...fields}
+            let ts = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as i64)
+                .unwrap_or(0);
+            let msg = args.get(0).map(|v| match v {
+                Value::Str(s) => s.as_str().to_string(),
+                other => other.to_string(),
+            }).unwrap_or_default();
+            fn json_escape(s: &str) -> String {
+                let mut o = String::with_capacity(s.len() + 2);
+                o.push('"');
+                for c in s.chars() {
+                    match c {
+                        '"' => o.push_str("\\\""),
+                        '\\' => o.push_str("\\\\"),
+                        '\n' => o.push_str("\\n"),
+                        '\r' => o.push_str("\\r"),
+                        '\t' => o.push_str("\\t"),
+                        c if (c as u32) < 0x20 => o.push_str(&format!("\\u{:04x}", c as u32)),
+                        c => o.push(c),
+                    }
+                }
+                o.push('"');
+                o
+            }
+            fn json_val(v: &Value) -> String {
+                match v {
+                    Value::Nil => "null".to_string(),
+                    Value::Bool(b) => b.to_string(),
+                    Value::Int(n) => n.to_string(),
+                    Value::Float(f) => {
+                        if f.is_finite() { f.to_string() } else { "null".to_string() }
+                    }
+                    Value::Str(s) => json_escape(s.as_str()),
+                    Value::Array(a) => {
+                        let parts: Vec<String> = a.borrow().iter().map(json_val).collect();
+                        format!("[{}]", parts.join(","))
+                    }
+                    Value::Map(m) => {
+                        let parts: Vec<String> = m.borrow().iter().map(|(k, v)| {
+                            let ks = match k {
+                                Value::Str(s) => s.as_str().to_string(),
+                                other => other.to_string(),
+                            };
+                            format!("{}:{}", json_escape(&ks), json_val(v))
+                        }).collect();
+                        format!("{{{}}}", parts.join(","))
+                    }
+                    other => json_escape(&other.to_string()),
+                }
+            }
+            let mut out = String::new();
+            out.push('{');
+            out.push_str(&format!("\"ts\":{}", ts));
+            out.push_str(&format!(",\"level\":{}", json_escape(level)));
+            out.push_str(&format!(",\"msg\":{}", json_escape(&msg)));
+            if let Some(Value::Map(m)) = args.get(1) {
+                for (k, v) in m.borrow().iter() {
+                    let ks = match k {
+                        Value::Str(s) => s.as_str().to_string(),
+                        other => other.to_string(),
+                    };
+                    if ks == "ts" || ks == "level" || ks == "msg" { continue; }
+                    out.push(',');
+                    out.push_str(&json_escape(&ks));
+                    out.push(':');
+                    out.push_str(&json_val(v));
+                }
+            }
+            out.push('}');
+            eprintln!("{}", out);
+            Ok(Value::Nil)
+        }
+        let log_info: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(|args| log_emit("info", args));
+        let log_warn: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(|args| log_emit("warn", args));
+        let log_error: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(|args| log_emit("error", args));
+        let log_debug: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(|args| log_emit("debug", args));
+        let log_mod = mk_map(vec![
+            ("info", Value::Native(log_info)),
+            ("warn", Value::Native(log_warn)),
+            ("error", Value::Native(log_error)),
+            ("debug", Value::Native(log_debug)),
+        ]);
+        env.borrow_mut().define("log", log_mod, false);
+
         // ---- net module (TCP) ----
         let eff_net1 = effects.clone();
         let net_listen: Rc<dyn Fn(&[Value]) -> Result<Value>> = Rc::new(move |args: &[Value]| {
@@ -1855,6 +2059,21 @@ impl Interpreter {
         for item in &program.items {
             match item {
                 Item::Import { path, alias, .. } => {
+                    // Detect name collisions between module alias and pre-existing
+                    // function/overload of the same name in the current scope.
+                    if let Some(alias_name) = alias {
+                        if let Some(existing) = self.globals.borrow().get(alias_name) {
+                            match &existing {
+                                Value::Function(_) | Value::Overloads(_) => {
+                                    return Err(RockError::runtime(format!(
+                                        "import alias '{}' collides with existing function '{}' — rename the module alias or the function",
+                                        alias_name, alias_name
+                                    )));
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
                     let pb = resolve_import_path(path, base_dir.as_deref())
                         .map_err(|e| RockError::runtime(format!("import '{}': {}", path, e)))?;
                     let canonical = std::fs::canonicalize(&pb).unwrap_or_else(|_| pb.clone());
@@ -1876,24 +2095,37 @@ impl Interpreter {
                     let toks = crate::lexer::Lexer::new(&src).tokenize()?;
                     let sub = crate::parser::Parser::new(toks).parse_program()?;
                     let parent = pb.parent().map(|p| p.to_path_buf());
-                    let before: std::collections::HashSet<String> =
-                        self.globals.borrow().names();
+                    let before_vals: std::collections::HashMap<String, Value> = {
+                        let g = self.globals.borrow();
+                        g.names().into_iter()
+                            .filter_map(|k| g.get(&k).map(|v| (k, v)))
+                            .collect()
+                    };
                     let prev_skip = *self.skip_main.borrow();
                     *self.skip_main.borrow_mut() = true;
                     let res = self.run_with_base(&sub, parent);
                     *self.skip_main.borrow_mut() = prev_skip;
                     res?;
                     if let Some(alias_name) = alias {
-                        let new_keys: Vec<String> = self.globals.borrow().names()
-                            .into_iter().filter(|k| !before.contains(k)).collect();
+                        // A module's alias Map should contain every top-level symbol the
+                        // module defined, even symbols whose names collide with pre-existing
+                        // builtins (e.g. a module defining `fn url_decode()` when `url.decode`
+                        // is a builtin). We detect this by comparing the VALUE of each name
+                        // before and after the sub-program runs, not just the set of names.
+                        let new_keys: Vec<String> = {
+                            let g = self.globals.borrow();
+                            g.names().into_iter().filter(|k| {
+                                match (before_vals.get(k), g.get(k)) {
+                                    (None, Some(_)) => true,
+                                    (Some(a), Some(b)) => !values_shallow_eq(a, &b),
+                                    _ => false,
+                                }
+                            }).collect()
+                        };
                         let mut entries: Vec<(Value, Value)> = Vec::with_capacity(new_keys.len());
                         let mut to_undefine: Vec<String> = Vec::new();
                         for k in &new_keys {
                             if let Some(v) = self.globals.borrow().get(k) {
-                                // Keep sub-module aliases (Map values) in globals so that
-                                // the imported module's functions can still resolve their
-                                // own imports when invoked later. Only move Function/
-                                // Overloads/Type decls into the parent alias map.
                                 let is_submodule_alias = matches!(v, Value::Map(_));
                                 entries.push((Value::Str(Rc::new(k.clone())), v));
                                 if !is_submodule_alias {
@@ -1903,6 +2135,13 @@ impl Interpreter {
                         }
                         for k in &to_undefine {
                             self.globals.borrow_mut().undefine(k);
+                        }
+                        // Restore any builtin values that the module temporarily shadowed
+                        // (so subsequent code in the outer scope still sees e.g. `url.decode`).
+                        for (k, v) in &before_vals {
+                            if to_undefine.contains(k) {
+                                self.globals.borrow_mut().define(k, v.clone(), false);
+                            }
                         }
                         self.globals.borrow_mut().define(
                             alias_name,
@@ -2744,6 +2983,18 @@ impl Interpreter {
                         Ok(inner_val)
                     }
                     _ => Ok(v),
+                }
+            }
+            Expr::TryCatch { try_body, err_name, catch_body, .. } => {
+                let try_env = Env::with_parent(env.clone());
+                match self.exec_block(try_body, &try_env) {
+                    Ok(v) => Ok(v),
+                    Err(Flow::Err(e)) => {
+                        let catch_env = Env::with_parent(env.clone());
+                        catch_env.borrow_mut().define(err_name, Value::Str(Rc::new(e.message.clone())), false);
+                        self.exec_block(catch_body, &catch_env)
+                    }
+                    Err(other) => Err(other),
                 }
             }
         }
@@ -3983,6 +4234,28 @@ fn builtin_method(recv: &Value, method: &str, args: &[Value]) -> Result<Value> {
 
 fn numeric_binop(a: &Value, b: &Value, op: BinOp) -> Result<Value> {
     eval_binop(a, b, op)
+}
+
+/// Shallow equality on Value for detecting whether an import redefined a
+/// pre-existing global. We only need to distinguish "same Rc/same function
+/// handle" from "different value"; deep structural equality would incorrectly
+/// report two different user-defined functions with the same body as equal.
+fn values_shallow_eq(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Nil, Value::Nil) => true,
+        (Value::Bool(x), Value::Bool(y)) => x == y,
+        (Value::Int(x), Value::Int(y)) => x == y,
+        (Value::Float(x), Value::Float(y)) => x.to_bits() == y.to_bits(),
+        (Value::Str(x), Value::Str(y)) => Rc::ptr_eq(x, y) || x.as_str() == y.as_str(),
+        (Value::Array(x), Value::Array(y)) => Rc::ptr_eq(x, y),
+        (Value::Map(x), Value::Map(y)) => Rc::ptr_eq(x, y),
+        (Value::Struct(x), Value::Struct(y)) => Rc::ptr_eq(x, y),
+        (Value::Function(x), Value::Function(y)) => Rc::ptr_eq(x, y),
+        (Value::Overloads(x), Value::Overloads(y)) => Rc::ptr_eq(x, y),
+        (Value::Native(x), Value::Native(y)) => Rc::ptr_eq(x, y),
+        (Value::TypeRef(x), Value::TypeRef(y)) => Rc::ptr_eq(x, y) || x.as_ref() == y.as_ref(),
+        _ => false,
+    }
 }
 
 fn default_value_cmp(a: &Value, b: &Value) -> std::cmp::Ordering {

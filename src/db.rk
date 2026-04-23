@@ -1,4 +1,3 @@
-import "log.rk" as log
 
 fn new_store(data_dir) {
     {

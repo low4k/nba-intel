@@ -1,4 +1,3 @@
-import "log.rk" as log
 import "db.rk" as db
 import "sources/espn.rk" as espn
 

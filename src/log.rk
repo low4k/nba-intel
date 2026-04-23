@@ -1,4 +1,0 @@
-fn info(msg)  { print(`[${time.now_iso()}] INFO  ${msg}`) }
-fn warn(msg)  { print(`[${time.now_iso()}] WARN  ${msg}`) }
-fn error(msg) { print(`[${time.now_iso()}] ERROR ${msg}`) }
-fn debug(msg) { print(`[${time.now_iso()}] DEBUG ${msg}`) }

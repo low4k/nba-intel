@@ -1015,6 +1015,20 @@ impl Parser {
                 } else { None };
                 Ok(Expr::If { cond: Box::new(cond), then, else_branch, span })
             }
+            Token::Try => {
+                // Try-expression form: `try { ... } catch (e) { ... }` used in
+                // expression position. The block's final expression becomes the
+                // value; on any error in the try-body, the catch-body runs with
+                // the error message string bound to `err_name` and its final
+                // expression becomes the value.
+                let try_body = self.parse_block()?;
+                self.expect(&Token::Catch, "expected 'catch' after try block")?;
+                self.expect(&Token::LParen, "expected '(' after 'catch'")?;
+                let err_name = self.expect_ident("expected error variable name")?;
+                self.expect(&Token::RParen, "expected ')' after error variable")?;
+                let catch_body = self.parse_block()?;
+                Ok(Expr::TryCatch { try_body, err_name, catch_body, span })
+            }
             other => Err(RockError::parse(
                 format!("unexpected token {:?}", other),
                 span.line,

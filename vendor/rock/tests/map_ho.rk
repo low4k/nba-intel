@@ -1,0 +1,18 @@
+fn is_short(k: str, v: int) -> int {
+    return k.len() <= 3
+}
+
+fn plus_one(v: int) -> int { return v + 1 }
+
+fn main() {
+    let m = {"a": 1, "bb": 2, "ccc": 3, "dddd": 4}
+
+    let short = m.filter(is_short)
+    assert(short.len() == 3)
+
+    let bumped = m.map_values(plus_one)
+    assert(bumped["a"] == 2)
+    assert(bumped["dddd"] == 5)
+
+    print("map ho ok")
+}

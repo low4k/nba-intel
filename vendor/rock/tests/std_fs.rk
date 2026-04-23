@@ -1,0 +1,10 @@
+fn main() {
+    let path = "/tmp/rock_fs_test.txt"
+    fs.write(path, "hello rock")
+    assert(fs.exists(path))
+    let content = fs.read(path)
+    assert(content == "hello rock")
+    assert(fs.exists("/tmp") == true)
+    assert(fs.exists("/nonexistent_path_xyz_9999") == false)
+    print("fs ok")
+}

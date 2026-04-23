@@ -1,0 +1,16 @@
+state_machine EngineState {
+    Booting -> Active
+    Active -> Halted
+}
+
+@prove {
+    assert_unreachable(EngineState.Halted -> EngineState.Booting)
+    assert_unreachable(EngineState.Halted -> EngineState.Active)
+    assert_unreachable(EngineState.Active -> EngineState.Booting)
+    assert_never(1 > 2)
+    assert_never(false)
+}
+
+fn main() {
+    print("prove ok")
+}

@@ -1,0 +1,29 @@
+type Point {
+    x: int,
+    y: int,
+}
+
+type Person {
+    name,
+    age,
+}
+
+fn main() {
+    let p = Point { x: 3, y: 4 }
+    print("point:", p)
+    print("x:", p.x, "y:", p.y)
+
+    mut q := Point { x: 10, y: 20 }
+    q.x = 99
+    q.y += 5
+    print("after mutate:", q)
+
+    let alice = Person { name: "Alice", age: 30 }
+    print(alice.name, "is", alice.age)
+    assert_eq(alice.name, "Alice")
+    assert_eq(alice.age, 30)
+
+    let origin = Point { x: 0, y: 0 }
+    assert_eq(origin.x, 0)
+    print("ok")
+}

@@ -1,0 +1,20 @@
+// Smoke test for http module — uses a tiny local server in a goroutine-equivalent.
+// We can't easily start one from rock, so just test that http functions exist
+// and return a sensible error for unreachable URLs.
+fn main() {
+    // Module is registered
+    let mod_keys = keys(http)
+    assert(mod_keys.len() == 2)
+
+    // Calling get on a nonsense URL should return an error (we just check it doesn't crash silently)
+    let ok = false
+    // Not using try here: we rely on a port that's almost certainly closed.
+    // If it errors, that's expected behavior — we can't assert it without try-catch syntax.
+    // So just confirm the function reference exists.
+    let g = http.get
+    let p = http.post
+    assert(type_of(g) == "native")
+    assert(type_of(p) == "native")
+
+    print("http registered ok")
+}

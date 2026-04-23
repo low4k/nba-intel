@@ -1,0 +1,15 @@
+@pure
+fn add(a: int, b: int) -> int {
+    return a + b
+}
+
+@no_alloc
+fn mul(a: int, b: int) -> int {
+    return a * b
+}
+
+fn main() {
+    assert(add(2, 3) == 5)
+    assert(mul(4, 5) == 20)
+    print("effects ok")
+}

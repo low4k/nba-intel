@@ -1,0 +1,26 @@
+fn main() {
+    let h1 = crypto.fnv1a("hello")
+    let h2 = crypto.fnv1a("hello")
+    assert(h1 == h2)
+    let h3 = crypto.fnv1a("world")
+    assert(h1 != h3)
+
+    let d1 = crypto.djb2("hello")
+    let d2 = crypto.djb2("hello")
+    assert(d1 == d2)
+
+    let enc = crypto.base64_encode("hello")
+    assert(enc == "aGVsbG8=")
+
+    let dec = crypto.base64_decode("aGVsbG8=")
+    assert(dec == "hello")
+
+    let enc2 = crypto.base64_encode("Rock!")
+    let dec2 = crypto.base64_decode(enc2)
+    assert(dec2 == "Rock!")
+
+    let hx = crypto.hex_encode("Hi")
+    assert(hx == "4869")
+
+    print("crypto ok")
+}

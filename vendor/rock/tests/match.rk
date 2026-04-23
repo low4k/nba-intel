@@ -1,0 +1,27 @@
+fn describe(n) {
+    match n {
+        0 => "zero",
+        1 => "one",
+        2 => "two",
+        x if x < 0 => "negative",
+        x if x < 10 => "small",
+        _ => "large",
+    }
+}
+
+fn main() {
+    for n in 0..4 {
+        print(n, describe(n))
+    }
+    print(-3, describe(-3))
+    print(7, describe(7))
+    print(100, describe(100))
+
+    grade := match 85 {
+        s if s >= 90 => "A",
+        s if s >= 80 => "B",
+        s if s >= 70 => "C",
+        _ => "F",
+    }
+    print("grade", grade)
+}

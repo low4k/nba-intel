@@ -1,0 +1,11 @@
+fn main() {
+    port := nil ?? 8080
+    print("port", port)
+
+    name := "Alice" ?? "guest"
+    print("name", name)
+
+    value := 42
+    unwrapped := value!
+    print("unwrapped", unwrapped)
+}

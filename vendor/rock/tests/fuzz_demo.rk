@@ -1,0 +1,15 @@
+/// Computes a value that crashes on negative inputs.
+/// Useful for demonstrating `rock fuzz`.
+fn buggy(x) {
+    if x < 0 { panic("negative not allowed") }
+    x * 2
+}
+
+/// Always safe.
+fn safe(x) {
+    x * x + 1
+}
+
+fn main() {
+    print(safe(5))
+}

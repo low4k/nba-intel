@@ -1,0 +1,30 @@
+// Tests using `rock test` test runner.
+// Each `fn test_*()` is run; success = no panic.
+
+fn add(a, b) { a + b }
+fn mul(a, b) { a * b }
+
+fn test_add_works() {
+    assert_eq(add(2, 3), 5)
+    assert_eq(add(-1, 1), 0)
+}
+
+fn test_mul_works() {
+    assert_eq(mul(3, 4), 12)
+    assert_eq(mul(0, 99), 0)
+}
+
+fn test_string_ops() {
+    assert_eq("hello".upper(), "HELLO")
+    assert_eq("  x  ".trim(), "x")
+}
+
+fn test_array_ops() {
+    let a = [1, 2, 3].map(fn(x) { x * 10 })
+    assert_eq(a, [10, 20, 30])
+    assert_eq([1, 2, 3, 4].filter(fn(x) { x > 2 }), [3, 4])
+}
+
+fn helper_not_a_test() {
+    panic("should never run")
+}

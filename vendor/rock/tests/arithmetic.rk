@@ -1,0 +1,14 @@
+fn main() {
+    a := 7
+    b := 3
+    print("sum", a + b)
+    print("diff", a - b)
+    print("prod", a * b)
+    print("quot", a / b)
+    print("mod", a % b)
+
+    x := 1.5
+    y := 2.5
+    print("fsum", x + y)
+    print("mixed", a + x)
+}

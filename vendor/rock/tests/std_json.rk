@@ -1,0 +1,28 @@
+fn main() {
+    let v = json.parse("{\"name\": \"rock\", \"version\": 1, \"flags\": [true, false, null]}")
+    assert(v["name"] == "rock")
+    assert(v["version"] == 1)
+    assert(v["flags"].len() == 3)
+    assert(v["flags"][0] == true)
+    assert(v["flags"][2] == nil)
+
+    let arr = json.parse("[1, 2, 3.5, \"x\"]")
+    assert(arr.len() == 4)
+    assert(arr[0] == 1)
+    assert(arr[3] == "x")
+
+    let out = json.stringify([1, 2, 3])
+    assert(out == "[1,2,3]")
+
+    let obj = json.stringify({"a": 1, "b": "hi"})
+    assert(obj.contains("\"a\":1"))
+    assert(obj.contains("\"b\":\"hi\""))
+
+    let num = json.stringify(42)
+    assert(num == "42")
+
+    let s = json.stringify("hello")
+    assert(s == "\"hello\"")
+
+    print("json ok")
+}

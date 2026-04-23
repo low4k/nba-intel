@@ -1,0 +1,123 @@
+type Point {
+    x,
+    y,
+}
+
+type Shape {
+    kind,
+    size,
+}
+
+fn classify(p) {
+    match p {
+        Point { x: 0, y: 0 } => "origin",
+        Point { x: 0, y } => "on y-axis",
+        Point { x, y: 0 } => "on x-axis",
+        Point { x, y } => "somewhere",
+        _ => "not a point",
+    }
+}
+
+fn describe(arr) {
+    match arr {
+        [] => "empty",
+        [x] => "one",
+        [x, y] => "pair",
+        [x, y, z] => "triple",
+        [first, ..rest] => "many",
+    }
+}
+
+fn first_two(arr) {
+    match arr {
+        [a, b, .._] => [a, b],
+        _ => [],
+    }
+}
+
+fn kind_is(s) {
+    match s {
+        Shape { kind: "circle", size } => size,
+        Shape { kind: "square" | "rect", size } => size * 2,
+        _ => -1,
+    }
+}
+
+fn main() {
+    assert_eq(classify(Point { x: 0, y: 0 }), "origin")
+    assert_eq(classify(Point { x: 0, y: 5 }), "on y-axis")
+    assert_eq(classify(Point { x: 7, y: 0 }), "on x-axis")
+    assert_eq(classify(Point { x: 3, y: 4 }), "somewhere")
+
+    assert_eq(describe([]), "empty")
+    assert_eq(describe([1]), "one")
+    assert_eq(describe([1, 2]), "pair")
+    assert_eq(describe([1, 2, 3]), "triple")
+    assert_eq(describe([1, 2, 3, 4, 5]), "many")
+
+    assert_eq(first_two([10, 20, 30, 40]), [10, 20])
+
+    assert_eq(kind_is(Shape { kind: "circle", size: 5 }), 5)
+    assert_eq(kind_is(Shape { kind: "square", size: 3 }), 6)
+    assert_eq(kind_is(Shape { kind: "rect", size: 4 }), 8)
+    assert_eq(kind_is(Shape { kind: "triangle", size: 9 }), -1)
+
+    // nested array patterns
+    let nested = [[1, 2], [3, 4]]
+    match nested {
+        [[a, b], [c, d]] => {
+            assert_eq(a, 1)
+            assert_eq(b, 2)
+            assert_eq(c, 3)
+            assert_eq(d, 4)
+        },
+        _ => panic("no match"),
+    }
+
+    // or patterns on literals
+    let x = 3
+    let r = match x {
+        1 | 2 | 3 => "small",
+        4 | 5 | 6 => "mid",
+        _ => "other",
+    }
+    assert_eq(r, "small")
+
+    // rest binding captures array
+    let r2 = match [1, 2, 3, 4] {
+        [head, ..tail] => tail,
+        _ => [],
+    }
+    assert_eq(r2, [2, 3, 4])
+
+    // destructuring let: array
+    let [a, b, c] = [10, 20, 30]
+    assert_eq(a, 10)
+    assert_eq(b, 20)
+    assert_eq(c, 30)
+
+    // destructuring let: rest
+    let [first, ..rest] = [1, 2, 3, 4]
+    assert_eq(first, 1)
+    assert_eq(rest, [2, 3, 4])
+
+    // destructuring let: struct
+    let pt = Point { x: 7, y: 8 }
+    let Point { x, y } = pt
+    assert_eq(x, 7)
+    assert_eq(y, 8)
+
+    // destructuring let: nested
+    let [[p, q], [r3, s]] = [[1, 2], [3, 4]]
+    assert_eq(p, 1)
+    assert_eq(q, 2)
+    assert_eq(r3, 3)
+    assert_eq(s, 4)
+
+    // destructuring let: struct with rename
+    let Point { x: xx, y: yy } = Point { x: 100, y: 200 }
+    assert_eq(xx, 100)
+    assert_eq(yy, 200)
+
+    print("patterns ok")
+}

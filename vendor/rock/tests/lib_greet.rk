@@ -1,0 +1,9 @@
+fn greet(name) {
+    "hello, " + name
+}
+
+fn shout(s) {
+    s + "!"
+}
+
+const PI = 3.14159

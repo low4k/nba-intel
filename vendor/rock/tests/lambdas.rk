@@ -1,0 +1,22 @@
+fn make_adder(n) {
+    fn(x) { x + n }
+}
+
+fn apply(f, x) { f(x) }
+
+fn main() {
+    add5 := make_adder(5)
+    add10 := make_adder(10)
+    print("add5(3) =", add5(3))
+    print("add10(3) =", add10(3))
+
+    square := fn(x) { x * x }
+    print("square(7) =", square(7))
+
+    mut total := 0
+    numbers := [1, 2, 3, 4, 5]
+    for n in numbers {
+        total = apply(fn(v) { v + total }, n)
+    }
+    print("total =", total)
+}

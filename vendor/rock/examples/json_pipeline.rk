@@ -1,0 +1,19 @@
+// Read a JSON document, transform it, write it back.
+// Run with:  rock run examples/json_pipeline.rk
+
+fn main() {
+    let src = "[{\"name\":\"Alice\",\"score\":80},{\"name\":\"Bob\",\"score\":92},{\"name\":\"Cat\",\"score\":71}]"
+
+    let people = json.parse(src)
+
+    let with_grade = []
+    for p in people {
+        let grade = if p["score"] >= 90 { "A" }
+                    else if p["score"] >= 80 { "B" }
+                    else { "C" }
+        let augmented = { "name": p["name"], "score": p["score"], "grade": grade }
+        push(with_grade, augmented)
+    }
+
+    print(json.stringify(with_grade))
+}

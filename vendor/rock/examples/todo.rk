@@ -1,0 +1,64 @@
+// A tiny in-memory todo list with structs and impl methods.
+// Run with:  rock run examples/todo.rk
+
+type Task {
+    id: int,
+    title: str,
+    done: bool,
+}
+
+type TodoList {
+    next_id: int,
+    tasks: any,         // array of Task
+}
+
+impl TodoList {
+    fn new() {
+        TodoList { next_id: 1, tasks: [] }
+    }
+
+    fn add(self, title) {
+        let t = Task { id: self.next_id, title: title, done: false }
+        push(self.tasks, t)
+        self.next_id = self.next_id + 1
+        t
+    }
+
+    fn complete(self, id) {
+        for t in self.tasks {
+            if t.id == id { t.done = true; return true }
+        }
+        false
+    }
+
+    fn pending(self) {
+        let mut out = []
+        for t in self.tasks { if not t.done { push(out, t) } }
+        out
+    }
+
+    fn print_all(self) {
+        for t in self.tasks {
+            let mark = if t.done { "[x]" } else { "[ ]" }
+            print(`${mark} #${t.id} ${t.title}`)
+        }
+    }
+}
+
+fn main() {
+    let list = TodoList.new()
+    list.add("write Rock language")
+    list.add("write the docs")
+    list.add("ship it")
+
+    list.complete(1)
+    list.complete(2)
+
+    print("--- all tasks ---")
+    list.print_all()
+
+    print(`--- ${len(list.pending())} still to do ---`)
+    for t in list.pending() {
+        print(`  • ${t.title}`)
+    }
+}

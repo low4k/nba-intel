@@ -1,0 +1,30 @@
+// Compute primes ≤ N with the Sieve of Eratosthenes.
+// Run with:  rock run examples/primes.rk
+
+fn primes_up_to(n) {
+    if n < 2 { return [] }
+    let mut sieve = [true; n + 1]
+    sieve[0] = false
+    sieve[1] = false
+
+    let mut i = 2
+    while i * i <= n {
+        if sieve[i] {
+            let mut j = i * i
+            while j <= n { sieve[j] = false; j = j + i }
+        }
+        i = i + 1
+    }
+
+    let mut out = []
+    for k in 2..(n + 1) {
+        if sieve[k] { push(out, k) }
+    }
+    out
+}
+
+fn main() {
+    let ps = primes_up_to(100)
+    print(`found ${len(ps)} primes ≤ 100`)
+    print(ps)
+}

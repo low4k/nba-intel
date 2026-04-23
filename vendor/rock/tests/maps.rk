@@ -1,0 +1,19 @@
+fn main() {
+    tickers := { "AAPL": 175.23, "TSLA": 240.10, "NVDA": 890.50 }
+    print("apple", tickers["AAPL"])
+    print("tesla via field", tickers.TSLA)
+
+    mut counts := { "a": 1, "b": 2 }
+    counts["c"] = 3
+    counts["a"] = 99
+    print("counts", counts)
+
+    print("has a?", has(counts, "a"))
+    print("has z?", has(counts, "z"))
+    print("keys", keys(counts))
+    print("values", values(counts))
+
+    for entry in counts {
+        print(" pair", entry[0], "->", entry[1])
+    }
+}

@@ -1,0 +1,38 @@
+fn main() {
+    // Basic ops
+    assert_eq(bits.band(0b1100, 0b1010), 0b1000)
+    assert_eq(bits.bor(0b1100, 0b1010), 0b1110)
+    assert_eq(bits.bxor(0b1100, 0b1010), 0b0110)
+
+    // Shifts
+    assert_eq(bits.shl(1, 8), 256)
+    assert_eq(bits.shr(256, 8), 1)
+    assert_eq(bits.sar(-2, 1), -1)
+
+    // Single-bit ops
+    assert_eq(bits.get(0b1010, 0), 0)
+    assert_eq(bits.get(0b1010, 1), 1)
+    assert_eq(bits.get(0b1010, 3), 1)
+    assert_eq(bits.set(0, 5, 1), 32)
+    assert_eq(bits.set(0b1111, 1, 0), 0b1101)
+
+    // Population / scan
+    assert_eq(bits.count_ones(0b10110101), 5)
+    assert_eq(bits.trailing_zeros(0b1000), 3)
+
+    // Rotate
+    assert_eq(bits.rotate_left(1, 4), 16)
+
+    // Hex/bin round-trips
+    assert_eq(bits.to_hex(255), "ff")
+    assert_eq(bits.to_bin(10), "1010")
+    assert_eq(bits.from_hex("ff"), 255)
+    assert_eq(bits.from_hex("0xff"), 255)
+    assert_eq(bits.from_bin("1010"), 10)
+    assert_eq(bits.from_bin("0b1010"), 10)
+
+    // not flips all bits (two's complement: !0 == -1)
+    assert_eq(bits.bnot(0), -1)
+
+    print("bits ok")
+}

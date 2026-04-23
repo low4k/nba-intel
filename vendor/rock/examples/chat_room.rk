@@ -1,0 +1,28 @@
+// Tiny TCP echo server using std.net + spawn + try/catch.
+// Run with:  rock run examples/chat_room.rk
+// Then in another terminal:  nc localhost 7777
+//
+// This is a single-task echo (one connection at a time) — kept short for clarity.
+
+fn handle(conn) {
+    try {
+        let line = net.read(conn, 1024)
+        if len(line) > 0 {
+            net.write(conn, `you said: ${line.trim()}\n`)
+        }
+    } catch (e) {
+        print(`conn error: ${e}`)
+    }
+    net.close(conn)
+}
+
+fn main() {
+    let listener = net.listen("127.0.0.1:7777")
+    print("echo server listening on 127.0.0.1:7777")
+
+    loop {
+        let acc = net.accept(listener)
+        print(`accepted from ${acc["peer"]}`)
+        handle(acc["conn"])
+    }
+}

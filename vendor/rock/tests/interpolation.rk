@@ -1,0 +1,13 @@
+fn greet(name, age) {
+    `Hello, ${name}! You are ${age} years old.`
+}
+
+fn main() {
+    x := 7
+    y := 8
+    print(`${x} * ${y} = ${x * y}`)
+    print(greet("Alice", 30))
+
+    items := [1, 2, 3]
+    print(`array has ${len(items)} elements: ${items}`)
+}

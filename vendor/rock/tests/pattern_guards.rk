@@ -1,0 +1,18 @@
+fn classify(n: int) -> str {
+    match n {
+        0 => "zero",
+        x if x < 0 => "negative",
+        x if x > 100 => "huge",
+        x if x % 2 == 0 => "even",
+        _ => "odd",
+    }
+}
+
+fn main() {
+    assert(classify(0) == "zero")
+    assert(classify(-5) == "negative")
+    assert(classify(200) == "huge")
+    assert(classify(4) == "even")
+    assert(classify(7) == "odd")
+    print("pattern guards ok")
+}

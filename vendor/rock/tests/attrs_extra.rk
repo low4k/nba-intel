@@ -1,0 +1,28 @@
+@hot
+fn tight_loop(n: int) -> int {
+    let mut sum = 0
+    let mut i = 0
+    loop {
+        if i >= n { break }
+        sum = sum + i
+        i = i + 1
+    }
+    return sum
+}
+
+@inline
+fn small(x: int) -> int {
+    return x * 2
+}
+
+@cold
+fn rarely_called() -> str {
+    return "cold"
+}
+
+fn main() {
+    assert(tight_loop(10) == 45)
+    assert(small(21) == 42)
+    assert(rarely_called() == "cold")
+    print("attrs_extra ok")
+}

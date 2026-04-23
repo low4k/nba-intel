@@ -1,0 +1,58 @@
+fn double(x: int) -> int { return x * 2 }
+fn is_even(x: int) -> int { return x % 2 == 0 }
+fn add(a: int, b: int) -> int { return a + b }
+
+fn main() {
+    let nums = [1, 2, 3, 4, 5]
+
+    let doubled = nums.map(double)
+    assert(doubled.len() == 5)
+    assert(doubled[0] == 2)
+    assert(doubled[4] == 10)
+
+    let evens = nums.filter(is_even)
+    assert(evens.len() == 2)
+    assert(evens[0] == 2)
+    assert(evens[1] == 4)
+
+    let sum = nums.reduce(add, 0)
+    assert(sum == 15)
+
+    assert(nums.any(is_even) == true)
+    assert(nums.all(is_even) == false)
+
+    let found = nums.find(is_even)
+    assert(found == 2)
+
+    let count = nums.count(is_even)
+    assert(count == 2)
+
+    assert(nums.sum() == 15)
+    assert(nums.min() == 1)
+    assert(nums.max() == 5)
+    assert(nums.first() == 1)
+    assert(nums.last() == 5)
+
+    let sliced = nums.slice(1, 4)
+    assert(sliced.len() == 3)
+    assert(sliced[0] == 2)
+    assert(sliced[2] == 4)
+
+    let nested = [[1, 2], [3, 4], [5]]
+    let flat = nested.flatten()
+    assert(flat.len() == 5)
+    assert(flat[4] == 5)
+
+    let words = ["banana", "apple", "cherry"]
+    let sorted = words.sort()
+    assert(sorted[0] == "apple")
+    assert(sorted[1] == "banana")
+    assert(sorted[2] == "cherry")
+
+    let nums2 = [3, 1, 4, 1, 5, 9, 2, 6]
+    let sorted_n = nums2.sort()
+    assert(sorted_n[0] == 1)
+    assert(sorted_n[7] == 9)
+
+    print("higher-order ok")
+}

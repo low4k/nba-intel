@@ -1,0 +1,19 @@
+fn classify(n) {
+    if n < 0 {
+        "negative"
+    } else if n == 0 {
+        "zero"
+    } else if n < 10 {
+        "small"
+    } else {
+        "big"
+    }
+}
+
+fn main() {
+    for n in 0..5 {
+        print(n, classify(n - 2))
+    }
+
+    print(classify(100))
+}

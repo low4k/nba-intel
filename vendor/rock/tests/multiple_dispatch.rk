@@ -1,0 +1,32 @@
+fn area(r: float) -> float {
+    return 3.14159 * r * r
+}
+
+fn area(w: float, h: float) -> float {
+    return w * h
+}
+
+fn describe(x: int) -> str {
+    return `int ${x}`
+}
+
+fn describe(x: str) -> str {
+    return `str ${x}`
+}
+
+fn describe(x: bool) -> str {
+    return `bool ${x}`
+}
+
+fn main() {
+    let circle = area(2.0)
+    let rect = area(3.0, 4.0)
+    print(circle)
+    print(rect)
+    print(describe(42))
+    print(describe("hi"))
+    print(describe(true))
+    assert(rect == 12.0)
+    assert(describe(7) == "int 7")
+    assert(describe("yo") == "str yo")
+}

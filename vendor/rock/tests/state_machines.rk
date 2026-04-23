@@ -1,0 +1,27 @@
+state_machine TrafficLight {
+    Red -> Green -> Yellow -> Red
+}
+
+state_machine EngineState {
+    Booting -> Active
+    Active -> Halted
+    Active -> Active
+}
+
+fn main() {
+    print("red:", TrafficLight.Red)
+    print("green:", TrafficLight.Green)
+    print("yellow:", TrafficLight.Yellow)
+
+    print("booting:", EngineState.Booting)
+    print("active:", EngineState.Active)
+    print("halted:", EngineState.Halted)
+
+    mut state := TrafficLight.Red
+    print("start:", state)
+    state = TrafficLight.Green
+    print("now:", state)
+
+    assert_eq(TrafficLight.Red, TrafficLight.Red)
+    print("ok")
+}

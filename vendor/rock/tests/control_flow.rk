@@ -1,0 +1,22 @@
+fn main() {
+    mut total := 0
+    for i in 1..11 {
+        total += i
+    }
+    print("sum 1..10 =", total)
+
+    mut n := 5
+    mut fact := 1
+    while n > 1 {
+        fact *= n
+        n -= 1
+    }
+    print("5! =", fact)
+
+    mut j := 0
+    loop {
+        if j >= 3 { break }
+        print("loop", j)
+        j += 1
+    }
+}

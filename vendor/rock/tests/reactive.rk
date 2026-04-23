@@ -1,0 +1,10 @@
+fn main() {
+    let mut temperature = 70.0
+    fan_active ~> temperature > 80.0
+    assert(fan_active == false)
+    temperature = 85.0
+    assert(fan_active == true)
+    temperature = 60.0
+    assert(fan_active == false)
+    print("reactive ok")
+}

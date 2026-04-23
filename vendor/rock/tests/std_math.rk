@@ -1,0 +1,31 @@
+fn main() {
+    assert(math.pi > 3.14)
+    assert(math.pi < 3.15)
+    assert(math.e > 2.71)
+
+    let s = math.sin(0.0)
+    assert(s > -0.001 and s < 0.001)
+
+    let c = math.cos(0.0)
+    assert(c > 0.999 and c < 1.001)
+
+    let r = math.sqrt(16.0)
+    assert(r > 3.999 and r < 4.001)
+
+    let p = math.pow(2.0, 10.0)
+    assert(p > 1023.9 and p < 1024.1)
+
+    let mn = math.min(3.0, 7.0)
+    assert(mn > 2.99 and mn < 3.01)
+
+    let mx = math.max(3.0, 7.0)
+    assert(mx > 6.99 and mx < 7.01)
+
+    let fl = math.floor(3.7)
+    assert(fl > 2.99 and fl < 3.01)
+
+    let ce = math.ceil(3.2)
+    assert(ce > 3.99 and ce < 4.01)
+
+    print("math ok")
+}

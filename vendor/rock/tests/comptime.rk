@@ -1,0 +1,19 @@
+fn build_squares() {
+    mut out := []
+    for i in 0..8 {
+        push(out, i * i)
+    }
+    return out
+}
+
+const SQUARES = @run build_squares()
+const MAGIC = @run 6 * 7
+
+fn main() {
+    print("squares:", SQUARES)
+    print("magic:", MAGIC)
+    assert_eq(MAGIC, 42)
+    assert_eq(SQUARES[3], 9)
+    assert_eq(SQUARES[7], 49)
+    print("ok")
+}

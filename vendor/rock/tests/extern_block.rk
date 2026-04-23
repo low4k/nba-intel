@@ -1,0 +1,8 @@
+@extern("c") {
+    fn memcpy(dest, src, n)
+    fn fast_hash(data) u64
+}
+
+fn main() {
+    print("extern block parsed ok")
+}

@@ -1,0 +1,23 @@
+fn double(x) { x * 2 }
+fn inc(x) { x + 1 }
+
+fn main() {
+    xs := [10, 20, 30, 40, 50]
+    print("array", xs)
+    print("len", len(xs))
+    print("xs[2]", xs[2])
+
+    mut ys := [1, 2, 3]
+    push(ys, 4)
+    push(ys, 5)
+    print("after push", ys)
+
+    mut total := 0
+    for v in ys {
+        total += v
+    }
+    print("sum", total)
+
+    result := 5 |> double |> inc
+    print("piped", result)
+}

@@ -1,0 +1,34 @@
+type Arena {
+    size,
+    label,
+}
+
+impl Arena {
+    fn new(size, label) {
+        return Arena { size: size, label: label }
+    }
+}
+
+fn unsafe_op() {
+    raw {
+        print("inside raw block")
+        return 999
+    }
+}
+
+fn main() {
+    let arena = Arena.new(1024, "main")
+    print("arena:", arena)
+
+    with arena {
+        print("with-block active")
+        let x = 10
+        let y = 20
+        print("sum:", x + y)
+    }
+
+    let r = unsafe_op()
+    print("raw result:", r)
+    assert_eq(r, 999)
+    print("ok")
+}

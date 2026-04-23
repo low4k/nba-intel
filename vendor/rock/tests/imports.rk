@@ -1,0 +1,6 @@
+import "lib/math_helpers.rk"
+
+fn main() {
+    print("square(6) =", square(6))
+    print("cube(3) =", cube(3))
+}

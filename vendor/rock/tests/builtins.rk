@@ -1,0 +1,26 @@
+fn main() {
+    assert(1 + 1 == 2, "basic math")
+    assert_eq(2 * 3, 6)
+    assert_eq(len([1, 2, 3]), 3)
+
+    n := int("42")
+    f := float("3.14")
+    assert_eq(n, 42)
+    assert(f > 3.13 and f < 3.15, "float parse")
+
+    assert_eq(type_of(42), "int")
+    assert_eq(type_of("hi"), "str")
+    assert_eq(type_of([]), "array")
+    assert_eq(type_of({ "a": 1 }), "map")
+
+    assert_eq(abs(-7), 7)
+    assert_eq(floor(3.9), 3)
+    assert(sqrt(16.0) == 4.0, "sqrt")
+
+    r := range(3, 6)
+    mut collected := []
+    for i in r { push(collected, i) }
+    assert_eq(collected, [3, 4, 5])
+
+    print("all builtins ok")
+}

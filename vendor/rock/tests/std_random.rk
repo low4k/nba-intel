@@ -1,0 +1,31 @@
+fn main() {
+    random.seed(42)
+    let a = random.int(0, 100)
+    assert(a >= 0 and a <= 100)
+
+    random.seed(42)
+    let b = random.int(0, 100)
+    assert(a == b)
+
+    let f = random.float()
+    assert(f >= 0.0 and f < 1.0)
+
+    let arr = [1, 2, 3, 4, 5]
+    let c = random.choice(arr)
+    assert(c >= 1 and c <= 5)
+
+    let shuf = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    random.shuffle(shuf)
+    assert(shuf.len() == 10)
+    let sum = 0
+    let mut i = 0
+    let mut total = 0
+    loop {
+        if i >= shuf.len() { break }
+        total = total + shuf[i]
+        i = i + 1
+    }
+    assert(total == 55)
+
+    print("random ok")
+}

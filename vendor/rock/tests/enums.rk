@@ -1,0 +1,80 @@
+enum Color {
+    Red,
+    Green,
+    Blue,
+    RGB(int, int, int),
+    Named { name: str, hex: int },
+}
+
+enum Shape {
+    Circle(float),
+    Square(float),
+    Rect(float, float),
+}
+
+fn describe(c) {
+    match c {
+        Red => "red",
+        Green => "green",
+        Blue => "blue",
+        RGB(r, g, b) => "rgb",
+        Named { name, hex } => name,
+    }
+}
+
+fn area(s) {
+    match s {
+        Circle(r) => 3.14159 * r * r,
+        Square(w) => w * w,
+        Rect(w, h) => w * h,
+    }
+}
+
+fn is_warm(c) {
+    match c {
+        Red | RGB(r, _, _) if true => true,
+        _ => false,
+    }
+}
+
+fn main() {
+    assert_eq(describe(Red), "red")
+    assert_eq(describe(Green), "green")
+    assert_eq(describe(Blue), "blue")
+    assert_eq(describe(RGB(255, 128, 0)), "rgb")
+    assert_eq(describe(Named { name: "crimson", hex: 14423100 }), "crimson")
+
+    // qualified access via enum map
+    assert_eq(describe(Color.Red), "red")
+
+    // area calculation
+    assert_eq(area(Square(4.0)), 16.0)
+    assert_eq(area(Rect(3.0, 5.0)), 15.0)
+
+    // destructuring in let
+    let RGB(r, g, b) = RGB(10, 20, 30)
+    assert_eq(r, 10)
+    assert_eq(g, 20)
+    assert_eq(b, 30)
+
+    let Named { name, hex } = Named { name: "gold", hex: 16766720 }
+    assert_eq(name, "gold")
+    assert_eq(hex, 16766720)
+
+    // variant as first-class value
+    let colors = [Red, Green, Blue]
+    assert_eq(colors.len(), 3)
+    assert_eq(describe(colors[1]), "green")
+
+    // nested matching
+    let box = Rect(2.0, 8.0)
+    match box {
+        Rect(w, h) => {
+            assert_eq(w, 2.0)
+            assert_eq(h, 8.0)
+        },
+        _ => panic("not a rect"),
+    }
+
+    print("enums ok")
+}

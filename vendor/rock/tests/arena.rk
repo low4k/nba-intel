@@ -1,0 +1,16 @@
+fn main() {
+    let a = arena_new(1024 * 1024)
+    assert(arena_used(a) == 0)
+    arena_alloc(a, 100)
+    arena_alloc(a, 250)
+    assert(arena_used(a) == 350)
+    arena_clear(a)
+    assert(arena_used(a) == 0)
+
+    let b = arena_new(4096)
+    arena_alloc(b, 16)
+    assert(arena_used(b) == 16)
+    assert(arena_used(a) == 0)
+
+    print("arena ok")
+}

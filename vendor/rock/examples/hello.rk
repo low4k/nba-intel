@@ -1,0 +1,17 @@
+// Rock — the smallest possible program.
+// Run with:  rock run examples/hello.rk
+
+fn main() {
+    let name = "world"
+    print(`Hello, ${name}!`)
+
+    // Interpolation can include any expression.
+    let nums = [1, 2, 3, 4, 5]
+    print(`sum of ${len(nums)} numbers = ${sum(nums)}`)
+}
+
+fn sum(arr) {
+    let mut total = 0
+    for x in arr { total += x }
+    total
+}

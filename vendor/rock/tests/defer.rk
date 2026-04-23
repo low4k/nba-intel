@@ -1,0 +1,17 @@
+fn process() {
+    print("step 1: open resource")
+    defer {
+        print("cleanup 1")
+    }
+    defer {
+        print("cleanup 2")
+    }
+    print("step 2: do work")
+    print("step 3: done")
+}
+
+fn main() {
+    process()
+    print("---")
+    print("after process()")
+}

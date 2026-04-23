@@ -1,0 +1,54 @@
+fn main() {
+    // string methods
+    assert_eq("hello".chars(), ["h", "e", "l", "l", "o"])
+    assert_eq("ab".bytes(), [97, 98])
+    assert_eq("ab".repeat(3), "ababab")
+    assert_eq("hello world".find("world"), 6)
+    assert_eq("hello".find("xyz"), -1)
+    assert_eq("7".pad_left(3), "  7")
+    assert_eq("7".pad_left(3, "0"), "007")
+    assert_eq("hi".pad_right(5, "."), "hi...")
+    assert_eq("rock".char_at(0), "r")
+    assert_eq("rock".char_at(-1), "k")
+    assert_eq("hello world".slice(6), "world")
+    assert_eq("hello world".slice(0, 5), "hello")
+    assert_eq("42".to_int(), 42)
+    assert_eq("3.14".to_float(), 3.14)
+    assert_eq("not a number".to_int(), nil)
+    assert_eq("".is_empty(), true)
+    assert_eq("a\nb\nc".lines(), ["a", "b", "c"])
+
+    // numeric methods
+    assert_eq((42).to_str(), "42")
+    assert_eq((-5).abs(), 5)
+    assert_eq((3.7).floor(), 3)
+    assert_eq((3.2).ceil(), 4)
+    assert_eq((3.5).round(), 4)
+    assert_eq(true.to_str(), "true")
+
+    // tuple expressions become arrays
+    let pair = (1, 2)
+    assert_eq(pair, [1, 2])
+    let triple = (10, 20, 30)
+    assert_eq(triple[1], 20)
+
+    // tuple destructuring
+    let (a, b) = (100, 200)
+    assert_eq(a, 100)
+    assert_eq(b, 200)
+
+    // array methods
+    assert_eq([1, 2, 3, 4, 5].take(3), [1, 2, 3])
+    assert_eq([1, 2, 3, 4, 5].drop(2), [3, 4, 5])
+    assert_eq([1, 2, 3].zip([10, 20, 30]), [[1, 10], [2, 20], [3, 30]])
+    assert_eq([1, 2, 3, 4, 5].chunks(2), [[1, 2], [3, 4], [5]])
+    assert_eq([1, 2, 3, 4].windows(2), [[1, 2], [2, 3], [3, 4]])
+    assert_eq([1, 1, 2, 3, 2, 4].unique(), [1, 2, 3, 4])
+    assert_eq(["a", "b"].enumerate(), [[0, "a"], [1, "b"]])
+
+    // pipeline still works
+    let r = 5 |> (fn(x) { x * 2 }) |> (fn(x) { x + 1 })
+    assert_eq(r, 11)
+
+    print("strings_arrays ok")
+}

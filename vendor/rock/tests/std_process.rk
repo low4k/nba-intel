@@ -1,0 +1,15 @@
+fn main() {
+    let args = process.args()
+    assert(args.len() >= 1)
+
+    let cwd = process.cwd()
+    assert(cwd.len() > 0)
+
+    let path = process.env("PATH")
+    assert(path == nil or path.len() > 0)
+
+    let missing = process.env("ROCK_TEST_MISSING_VAR_XYZ_9999")
+    assert(missing == nil)
+
+    print("process ok")
+}

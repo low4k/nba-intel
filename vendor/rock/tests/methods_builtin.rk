@@ -1,0 +1,37 @@
+fn main() {
+    let xs = [3, 1, 4, 1, 5, 9, 2, 6]
+    print("len:", xs.len())
+    print("contains 5:", xs.contains(5))
+    print("join:", xs.join(","))
+
+    let s = "  Hello, World!  "
+    print("upper:", s.upper())
+    print("lower:", s.lower())
+    print("trim:", s.trim())
+    print("starts 'He':", s.trim().starts_with("Hello"))
+    print("ends '!':", s.trim().ends_with("!"))
+    print("split:", s.trim().split(", "))
+    print("replace:", "foo bar foo".replace("foo", "baz"))
+
+    mut m := { "a": 1, "b": 2, "c": 3 }
+    print("keys:", m.keys())
+    print("values:", m.values())
+    print("has a:", m.has("a"))
+    print("has z:", m.has("z"))
+    let removed = m.remove("b")
+    print("removed:", removed, "map now:", m)
+
+    mut arr := [1, 2, 3]
+    arr.push(4)
+    arr.push(5)
+    print("arr:", arr)
+    let popped = arr.pop()
+    print("popped:", popped, "arr:", arr)
+    arr.reverse()
+    print("reversed:", arr)
+
+    assert_eq(xs.len(), 8)
+    assert(xs.contains(5))
+    assert(not xs.contains(99))
+    print("ok")
+}

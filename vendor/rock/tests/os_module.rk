@@ -1,0 +1,30 @@
+fn main() {
+    // platform / arch / family are non-empty strings
+    let p = os.platform()
+    assert(len(p) > 0)
+    let a = os.arch()
+    assert(len(a) > 0)
+    let f = os.family()
+    assert(f == "unix" or f == "windows")
+
+    // cwd returns a string
+    let c = os.cwd()
+    assert(len(c) > 0)
+
+    // env round-trip
+    os.set_env("ROCK_TEST_VAR", "hello-rock")
+    assert_eq(os.get_env("ROCK_TEST_VAR"), "hello-rock")
+
+    // missing var returns nil
+    assert_eq(os.get_env("__definitely_not_set__"), nil)
+
+    // user_home and temp_dir return strings (or nil for home in odd envs)
+    let t = os.temp_dir()
+    assert(len(t) > 0)
+
+    // path_sep and line_sep are non-empty
+    assert(len(os.path_sep) > 0)
+    assert(len(os.line_sep) > 0)
+
+    print("os ok")
+}

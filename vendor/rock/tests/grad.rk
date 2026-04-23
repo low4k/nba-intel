@@ -1,0 +1,26 @@
+fn square(x: float) -> float {
+    return x * x
+}
+
+fn weighted_sum(w: float, x: float) -> float {
+    return w * x * x
+}
+
+fn main() {
+    let g = @grad(square, 3.0)
+    assert(g.len() == 1)
+    let dx = g[0]
+    assert(dx > 5.99)
+    assert(dx < 6.01)
+
+    let g2 = @grad(weighted_sum, 2.0, 5.0)
+    assert(g2.len() == 2)
+    let dw = g2[0]
+    assert(dw > 24.99)
+    assert(dw < 25.01)
+    let dx2 = g2[1]
+    assert(dx2 > 19.99)
+    assert(dx2 < 20.01)
+
+    print("grad ok")
+}

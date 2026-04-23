@@ -1,0 +1,12 @@
+import "lib_greet.rk" as g
+
+fn main() {
+    let h = g.greet("world")
+    assert_eq(h, "hello, world")
+    assert_eq(g.shout(h), "hello, world!")
+    assert_eq(g.PI, 3.14159)
+    // The bare name should NOT be available since aliased
+    let names = keys(g)
+    assert(names.len() >= 3)
+    print("named imports ok")
+}

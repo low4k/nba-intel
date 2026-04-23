@@ -1,0 +1,22 @@
+fn worker(ch) {
+    let msg = recv(ch)
+    print("worker got:", msg)
+}
+
+fn main() {
+    let ch = channel()
+    send(ch, "hello")
+    send(ch, "world")
+    send(ch, 42)
+
+    print("queue size:", channel_len(ch))
+    assert_eq(channel_len(ch), 3)
+
+    let first = recv(ch)
+    assert_eq(first, "hello")
+
+    spawn worker(ch)
+    spawn worker(ch)
+
+    print("ok")
+}

@@ -1,0 +1,2 @@
+fn square(x) { x * x }
+fn cube(x) { x * x * x }

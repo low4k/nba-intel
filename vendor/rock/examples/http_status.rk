@@ -1,0 +1,15 @@
+// Fetch a URL and pretty-print the status; gracefully recover from network errors.
+// Run with:  rock run examples/http_status.rk
+
+fn main() {
+    let url = "http://example.com/"
+    print(`GET ${url}`)
+
+    try {
+        let resp = http.get(url)
+        print(`status: ${resp["status"]}`)
+        print(`body length: ${len(resp["body"])} bytes`)
+    } catch (e) {
+        print(`request failed: ${e}`)
+    }
+}

@@ -1,0 +1,37 @@
+fn double(x: int) -> int {
+    return x * 2
+}
+
+fn greet(name: str) -> str {
+    return "hi, " + name
+}
+
+fn main() {
+    let t = spawn double(21)
+    let r = await t
+    assert(r == 42)
+
+    let t2 = spawn greet("rock")
+    assert(await t2 == "hi, rock")
+
+    let tasks = []
+    let i = 0
+    let mut n = 0
+    loop {
+        if n >= 5 { break }
+        push(tasks, spawn double(n))
+        n = n + 1
+    }
+    let results = []
+    let mut j = 0
+    loop {
+        if j >= tasks.len() { break }
+        push(results, await tasks[j])
+        j = j + 1
+    }
+    assert(results.len() == 5)
+    assert(results[0] == 0)
+    assert(results[4] == 8)
+
+    print("async ok")
+}

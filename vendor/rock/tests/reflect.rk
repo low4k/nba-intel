@@ -1,0 +1,16 @@
+type Point {
+    x: int,
+    y: int,
+}
+
+fn main() {
+    let p = Point { x: 3, y: 4 }
+    let fields = @reflect(p)
+    assert(fields.len() == 2)
+    assert(fields[0].name == "x")
+    assert(fields[0].kind == "int")
+    assert(fields[0].value == 3)
+    assert(fields[1].name == "y")
+    assert(fields[1].value == 4)
+    print("reflect ok")
+}

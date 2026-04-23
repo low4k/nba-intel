@@ -1,0 +1,39 @@
+trait Greeter {
+    fn greet(self) -> str
+    fn shout(self) -> str {
+        return self.greet().upper()
+    }
+}
+
+type Dog {
+    name: str,
+}
+
+type Cat {
+    name: str,
+}
+
+impl Greeter for Dog {
+    fn greet(self) -> str {
+        return `Woof, I am ${self.name}`
+    }
+}
+
+impl Greeter for Cat {
+    fn greet(self) -> str {
+        return `Meow, I am ${self.name}`
+    }
+    fn shout(self) -> str {
+        return `MEOW MEOW FROM ${self.name}`
+    }
+}
+
+fn main() {
+    let d = Dog { name: "Rex" }
+    let c = Cat { name: "Whiskers" }
+    assert(d.greet() == "Woof, I am Rex")
+    assert(c.greet() == "Meow, I am Whiskers")
+    assert(d.shout() == "WOOF, I AM REX")
+    assert(c.shout() == "MEOW MEOW FROM Whiskers")
+    print("traits ok")
+}

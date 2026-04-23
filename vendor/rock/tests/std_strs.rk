@@ -1,0 +1,21 @@
+fn main() {
+    assert(strs.trim("  hello  ") == "hello")
+    assert(strs.upper("rock") == "ROCK")
+    assert(strs.lower("LOUD") == "loud")
+
+    let parts = strs.split("a,b,c", ",")
+    assert(parts.len() == 3)
+    assert(parts[0] == "a")
+    assert(parts[2] == "c")
+
+    let j = strs.join(["x", "y", "z"], "-")
+    assert(j == "x-y-z")
+
+    assert(strs.replace("foo bar foo", "foo", "baz") == "baz bar baz")
+    assert(strs.contains("hello world", "world") == true)
+    assert(strs.contains("hello world", "xyz") == false)
+    assert(strs.starts_with("rockstar", "rock") == true)
+    assert(strs.ends_with("rockstar", "star") == true)
+
+    print("strs ok")
+}

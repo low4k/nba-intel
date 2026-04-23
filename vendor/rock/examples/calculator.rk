@@ -1,0 +1,109 @@
+// A four-function calculator written in Rock.
+// Recursive-descent parser → AST evaluator. Showcases enums, match, recursion.
+// Run with:  rock run examples/calculator.rk
+
+enum Expr {
+    Num(float),
+    Bin { op: str, lhs: any, rhs: any },
+}
+
+type Lexer { src: str, pos: int }
+
+impl Lexer {
+    fn new(s) { Lexer { src: s, pos: 0 } }
+
+    fn peek(self) {
+        if self.pos >= len(self.src) { return "" }
+        self.src[self.pos]
+    }
+    fn advance(self) {
+        let c = self.peek()
+        self.pos = self.pos + 1
+        c
+    }
+    fn skip_ws(self) {
+        while self.pos < len(self.src) and self.peek() == " " { self.advance() }
+    }
+    fn next_number(self) {
+        let digits = ["0","1","2","3","4","5","6","7","8","9","."]
+        let mut s = ""
+        while self.pos < len(self.src) {
+            let c = self.peek()
+            let mut is_digit = false
+            for d in digits { if c == d { is_digit = true } }
+            if is_digit {
+                s = s + c
+                self.advance()
+            } else { break }
+        }
+        Num(float(s))
+    }
+}
+
+fn parse_expr(lex) {
+    let mut lhs = parse_term(lex)
+    lex.skip_ws()
+    while lex.peek() == "+" or lex.peek() == "-" {
+        let op = lex.advance()
+        lex.skip_ws()
+        let rhs = parse_term(lex)
+        lhs = Bin { op: op, lhs: lhs, rhs: rhs }
+        lex.skip_ws()
+    }
+    lhs
+}
+
+fn parse_term(lex) {
+    let mut lhs = parse_atom(lex)
+    lex.skip_ws()
+    while lex.peek() == "*" or lex.peek() == "/" {
+        let op = lex.advance()
+        lex.skip_ws()
+        let rhs = parse_atom(lex)
+        lhs = Bin { op: op, lhs: lhs, rhs: rhs }
+        lex.skip_ws()
+    }
+    lhs
+}
+
+fn parse_atom(lex) {
+    lex.skip_ws()
+    if lex.peek() == "(" {
+        lex.advance()
+        let e = parse_expr(lex)
+        lex.skip_ws()
+        if lex.peek() != ")" { panic("expected ')'") }
+        lex.advance()
+        return e
+    }
+    lex.next_number()
+}
+
+fn eval(e) {
+    match e {
+        Num(v) => v,
+        Bin { op, lhs, rhs } => {
+            let a = eval(lhs)
+            let b = eval(rhs)
+            match op {
+                "+" => a + b,
+                "-" => a - b,
+                "*" => a * b,
+                "/" => a / b,
+                _   => panic(`unknown op ${op}`),
+            }
+        }
+    }
+}
+
+fn calc(src) {
+    let lex = Lexer.new(src)
+    eval(parse_expr(lex))
+}
+
+fn main() {
+    print(`1 + 2 * 3       = ${calc("1 + 2 * 3")}`)
+    print(`(1 + 2) * 3     = ${calc("(1 + 2) * 3")}`)
+    print(`10 / 4 - 0.5    = ${calc("10 / 4 - 0.5")}`)
+    print(`2 * (3 + 4) - 1 = ${calc("2 * (3 + 4) - 1")}`)
+}

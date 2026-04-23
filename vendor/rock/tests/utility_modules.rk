@@ -1,0 +1,47 @@
+fn main() {
+    // base64 round-trip
+    assert_eq(base64.encode("hello"), "aGVsbG8=")
+    assert_eq(base64.decode("aGVsbG8="), "hello")
+    assert_eq(base64.decode(base64.encode("rock language!")), "rock language!")
+
+    // hex round-trip
+    assert_eq(hex.encode("ABC"), "414243")
+    assert_eq(hex.decode("414243"), "ABC")
+    assert_eq(hex.decode(hex.encode("rock!")), "rock!")
+
+    // uuid v4 format
+    let u = uuid.v4()
+    assert_eq(len(u), 36)
+    assert_eq(u[8], "-")
+    assert_eq(u[13], "-")
+    assert_eq(u[14], "4")             // version 4
+    assert_eq(u[18], "-")
+    assert_eq(u[23], "-")
+
+    // uuid v7
+    let v = uuid.v7()
+    assert_eq(len(v), 36)
+    assert_eq(v[14], "7")             // version 7
+
+    // uuids unique
+    let a = uuid.v4()
+    let b = uuid.v4()
+    assert(a != b)
+
+    // time formatting round-trip
+    let s = time.format_ms(0)
+    assert_eq(s, "1970-01-01T00:00:00.000Z")
+    let parsed = time.parse_iso("1970-01-01T00:00:00.000Z")
+    assert_eq(parsed, 0)
+
+    let s2 = time.format_ms(1_700_000_000_000)
+    let p2 = time.parse_iso(s2)
+    assert_eq(p2, 1_700_000_000_000)
+
+    // now_iso starts with the current millennium
+    let now = time.now_iso()
+    assert_eq(now[0], "2")
+    assert_eq(len(now), 24)
+
+    print("utility ok")
+}

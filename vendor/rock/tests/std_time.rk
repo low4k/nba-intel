@@ -1,0 +1,10 @@
+fn main() {
+    let t1 = time.now_ms()
+    assert(t1 > 0)
+    time.sleep_ms(10)
+    let t2 = time.now_ms()
+    assert(t2 >= t1)
+    let dt = t2 - t1
+    assert(dt >= 0)
+    print("time ok")
+}

@@ -1,0 +1,58 @@
+type Counter {
+    value,
+}
+
+impl Counter {
+    fn new(start) {
+        return Counter { value: start }
+    }
+
+    fn inc(self) {
+        self.value += 1
+    }
+
+    fn add(self, n) {
+        self.value += n
+    }
+
+    fn get(self) {
+        return self.value
+    }
+}
+
+type Rect {
+    w,
+    h,
+}
+
+impl Rect {
+    fn new(w, h) {
+        return Rect { w: w, h: h }
+    }
+
+    fn area(self) {
+        return self.w * self.h
+    }
+
+    fn scale(self, k) {
+        return Rect.new(self.w * k, self.h * k)
+    }
+}
+
+fn main() {
+    let c = Counter.new(10)
+    c.inc()
+    c.inc()
+    c.add(5)
+    print("counter:", c.get())
+    assert_eq(c.get(), 17)
+
+    let r = Rect.new(3, 4)
+    print("area:", r.area())
+    assert_eq(r.area(), 12)
+
+    let big = r.scale(5)
+    print("scaled:", big)
+    assert_eq(big.area(), 300)
+    print("ok")
+}

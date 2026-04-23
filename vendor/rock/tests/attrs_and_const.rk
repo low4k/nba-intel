@@ -1,0 +1,25 @@
+const PI = 3.14159
+const GREETING = "hello"
+const MAX = 100
+
+@pure
+fn square(x) {
+    return x * x
+}
+
+@hot
+@pure
+fn cube(x) {
+    return x * x * x
+}
+
+fn main() {
+    print("PI =", PI)
+    print("GREETING =", GREETING)
+    print("square(7) =", square(7))
+    print("cube(4) =", cube(4))
+    assert_eq(square(7), 49)
+    assert_eq(cube(4), 64)
+    assert(MAX > 50)
+    print("ok")
+}

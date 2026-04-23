@@ -1,0 +1,17 @@
+// Classic FizzBuzz, written with match guards.
+// Run with:  rock run examples/fizzbuzz.rk
+
+fn fizzbuzz(n) {
+    match [n % 3, n % 5] {
+        [0, 0] => "FizzBuzz",
+        [0, _] => "Fizz",
+        [_, 0] => "Buzz",
+        _      => str(n),
+    }
+}
+
+fn main() {
+    for i in 1..21 {
+        print(fizzbuzz(i))
+    }
+}

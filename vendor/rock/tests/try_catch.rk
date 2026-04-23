@@ -1,0 +1,71 @@
+fn risky(x) {
+    if x < 0 {
+        panic("negative not allowed: " + str(x))
+    }
+    x * 2
+}
+
+fn main() {
+    // Successful try block runs to completion.
+    let ok_result = "before"
+    try {
+        let v = risky(5)
+        assert_eq(v, 10)
+    } catch (e) {
+        panic("should not catch: " + e)
+    }
+    print("after success")
+
+    // Catch block runs on panic, message bound to err name.
+    let mut caught = false
+    try {
+        let _ = risky(-3)
+        panic("unreachable")
+    } catch (err) {
+        assert(err.contains("negative not allowed"))
+        assert(err.contains("-3"))
+        caught = true
+    }
+    assert(caught)
+
+    // try/catch around fs.read of a missing file
+    let mut saw_io_err = false
+    try {
+        let _ = fs.read("/this/file/definitely/does/not/exist.txt")
+    } catch (e) {
+        saw_io_err = true
+        assert(len(e) > 0)
+    }
+    assert(saw_io_err)
+
+    // Nested try/catch: inner catch handles inner error, outer continues.
+    let mut outer_ran = false
+    try {
+        try {
+            panic("inner boom")
+        } catch (inner) {
+            assert(inner.contains("inner boom"))
+        }
+        outer_ran = true
+    } catch (_e) {
+        panic("outer should not catch — inner already handled")
+    }
+    assert(outer_ran)
+
+    // Re-panic from inside catch propagates to outer catch.
+    let mut outer_caught = false
+    try {
+        try {
+            panic("first")
+        } catch (e1) {
+            panic("rethrown: " + e1)
+        }
+    } catch (e2) {
+        assert(e2.contains("rethrown"))
+        assert(e2.contains("first"))
+        outer_caught = true
+    }
+    assert(outer_caught)
+
+    print("try-catch ok")
+}

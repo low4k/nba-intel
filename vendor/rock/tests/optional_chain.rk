@@ -1,0 +1,24 @@
+type Profile {
+    name: str,
+    email: str,
+}
+
+type User {
+    id: int,
+    profile: Profile,
+}
+
+fn main() {
+    let u = User { id: 1, profile: Profile { name: "Alice", email: "a@x" } }
+    let name = u?.profile?.name ?? "Guest"
+    assert(name == "Alice")
+
+    let missing = nil
+    let fallback = missing?.profile?.name ?? "Guest"
+    assert(fallback == "Guest")
+
+    let empty_name = u?.nonexistent?.name ?? "none"
+    assert(empty_name == "none")
+
+    print("optional chain ok")
+}

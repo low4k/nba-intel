@@ -1,0 +1,23 @@
+fn fact(0) -> int {
+    return 1
+}
+
+fn fact(n: int) -> int {
+    return n * fact(n - 1)
+}
+
+fn fib(0) -> int { return 0 }
+fn fib(1) -> int { return 1 }
+fn fib(n: int) -> int {
+    return fib(n - 1) + fib(n - 2)
+}
+
+fn main() {
+    assert(fact(0) == 1)
+    assert(fact(5) == 120)
+    assert(fib(0) == 0)
+    assert(fib(1) == 1)
+    assert(fib(10) == 55)
+    print(fact(5))
+    print(fib(10))
+}

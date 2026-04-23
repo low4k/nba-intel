@@ -4,6 +4,13 @@
 .directory
 data/cache
 data/snapshots
+data/player_*.json
+data/team_*.json
 *.log
 /tmp
 .cache
+# vendor/rock IS needed by the Dockerfile (it's the rock interpreter source).
+# Only trim the pieces that would bloat the context uselessly:
+vendor/rock/rockc/target
+vendor/rock/.git
+vendor/rock/tests

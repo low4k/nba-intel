@@ -1,0 +1,26 @@
+fn main() {
+    assert_eq(path.join("a", "b", "c.txt"), "a/b/c.txt")
+    assert_eq(path.dirname("/foo/bar/baz.rk"), "/foo/bar")
+    assert_eq(path.basename("/foo/bar/baz.rk"), "baz.rk")
+    assert_eq(path.stem("/foo/bar/baz.rk"), "baz")
+    assert_eq(path.ext("/foo/bar/baz.rk"), "rk")
+    assert_eq(path.ext("/foo/bar/baz"), "")
+
+    assert_eq(path.is_abs("/etc/hosts"), true)
+    assert_eq(path.is_abs("etc/hosts"), false)
+
+    assert_eq(path.normalize("a/./b/../c"), "a/c")
+    assert_eq(path.normalize("/foo/./bar/../baz"), "/foo/baz")
+
+    let parts = path.split("a/b/c")
+    assert_eq(len(parts), 3)
+    assert_eq(parts[0], "a")
+    assert_eq(parts[2], "c")
+
+    // exists / is_file / is_dir against this very test directory
+    assert_eq(path.exists("."), true)
+    assert_eq(path.is_dir("."), true)
+    assert_eq(path.is_file("."), false)
+
+    print("path ok")
+}

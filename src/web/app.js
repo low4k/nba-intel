@@ -161,18 +161,114 @@ async function refreshLive() {
     const data = await api('/api/live');
     const games = Object.values(data.games || {});
     const html = games.length === 0
-      ? 'no games right now'
-      : games.map(g => `
+      ? '<div style="color:var(--muted)">no games right now</div>'
+      : games.map(g => {
+          const wp = typeof g.win_probability_home === 'number'
+            ? `${(g.win_probability_home * 100).toFixed(1)}%` : '—';
+          const pace = typeof g.pace_estimate === 'number'
+            ? g.pace_estimate.toFixed(1) : '—';
+          return `
           <div style="border:1px solid var(--border); border-radius:8px; padding:10px; margin:6px 0">
             <strong>${g.away.team} ${g.away.score} @ ${g.home.team} ${g.home.score}</strong>
             <div>${g.status} · Q${g.period} ${g.clock}</div>
-            <div>win prob (home): ${(g.win_probability * 100).toFixed(1)}% · pace est: ${g.pace_estimate.toFixed(1)}</div>
-          </div>`).join('');
+            <div>win prob (home): ${wp} · pace est: ${pace}</div>
+          </div>`;
+        }).join('');
     document.getElementById('live-list').innerHTML = html;
-    document.getElementById('dash-live').innerHTML = html || 'no games right now';
+    document.getElementById('dash-live').innerHTML = html;
   } catch (e) {
-    document.getElementById('live-list').textContent = 'live feed unavailable';
+    const msg = '<div style="color:var(--muted)">live feed unavailable</div>';
+    document.getElementById('live-list').innerHTML = msg;
+    document.getElementById('dash-live').innerHTML = msg;
   }
 }
+
+function renderLeaderList(rows) {
+  if (!rows || rows.length === 0) return '<div style="color:var(--muted)">—</div>';
+  return rows.map(r => `
+    <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0">
+      <span>${r.name || r.id}${r.team ? ` <span style="color:var(--muted)">${r.team}</span>` : ''}</span>
+      <strong>${typeof r.value === 'number' ? r.value.toFixed(1) : r.value}</strong>
+    </div>`).join('');
+}
+
+async function refreshLeaders() {
+  const el = document.getElementById('dash-leaders');
+  try {
+    const data = await api('/api/leaders');
+    el.innerHTML = `
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px">
+        <div><div style="color:var(--muted); font-size:11px; letter-spacing:0.5px">PTS</div>${renderLeaderList(data.pts)}</div>
+        <div><div style="color:var(--muted); font-size:11px; letter-spacing:0.5px">REB</div>${renderLeaderList(data.reb)}</div>
+        <div><div style="color:var(--muted); font-size:11px; letter-spacing:0.5px">AST</div>${renderLeaderList(data.ast)}</div>
+      </div>`;
+  } catch (e) {
+    el.innerHTML = '<div style="color:var(--muted)">leaders unavailable</div>';
+  }
+}
+
+// Pinned players: localStorage-backed list of ids shown on the dashboard.
+function pinnedIds() {
+  try { return JSON.parse(localStorage.getItem('nba-pinned') || '[]'); }
+  catch (_) { return []; }
+}
+function savePinned(ids) {
+  localStorage.setItem('nba-pinned', JSON.stringify(ids));
+}
+async function refreshPinned() {
+  const el = document.getElementById('dash-pinned');
+  const ids = pinnedIds();
+  if (ids.length === 0) {
+    el.innerHTML = '<div style="color:var(--muted)">pin a player from the Player tab (click Pin after Load)</div>';
+    return;
+  }
+  try {
+    const rows = await Promise.all(ids.map(id =>
+      api('/api/players/' + encodeURIComponent(id)).then(p => ({ id, p })).catch(() => ({ id, p: null }))));
+    el.innerHTML = rows.map(({ id, p }) => {
+      if (!p || !(p.name || '').length) return `
+        <div style="display:flex; justify-content:space-between; gap:8px; padding:3px 0">
+          <span style="color:var(--muted)">id ${id} (no data)</span>
+          <button data-unpin="${id}" style="padding:1px 6px">×</button>
+        </div>`;
+      const t = p.traditional || {};
+      return `
+        <div style="display:flex; justify-content:space-between; gap:8px; padding:3px 0">
+          <span>${p.name} <span style="color:var(--muted)">${p.team || ''}</span></span>
+          <span>${(t.pts || 0).toFixed(1)} / ${(t.reb || 0).toFixed(1)} / ${(t.ast || 0).toFixed(1)}
+            <button data-unpin="${id}" style="padding:1px 6px; margin-left:6px">×</button>
+          </span>
+        </div>`;
+    }).join('');
+    el.querySelectorAll('[data-unpin]').forEach(btn => btn.addEventListener('click', () => {
+      const id = btn.dataset.unpin;
+      savePinned(pinnedIds().filter(x => x !== id));
+      refreshPinned();
+    }));
+  } catch (e) {
+    el.innerHTML = '<div style="color:var(--muted)">pinned unavailable</div>';
+  }
+}
+
+// Pin button injected into the Player tab.
+(function addPinButton() {
+  const playerCard = document.querySelector('section[data-panel="player"] .card');
+  if (!playerCard) return;
+  const pinBtn = document.createElement('button');
+  pinBtn.textContent = 'Pin';
+  pinBtn.style.marginLeft = '6px';
+  playerCard.querySelector('#player-load').insertAdjacentElement('afterend', pinBtn);
+  pinBtn.addEventListener('click', () => {
+    const id = document.getElementById('player-id').value.trim();
+    if (!id) return;
+    const ids = pinnedIds();
+    if (!ids.includes(id)) { ids.push(id); savePinned(ids); }
+    refreshPinned();
+  });
+})();
+
 refreshLive();
+refreshLeaders();
+refreshPinned();
 setInterval(refreshLive, 8000);
+setInterval(refreshLeaders, 60000);

@@ -8,6 +8,7 @@ import "compare.rk" as cmp
 import "search.rk" as search
 import "live.rk" as live
 import "glossary.rk" as gloss
+import "leaders.rk" as leaders
 
 fn serve(config, store, live_state) {
     let listener = net.listen(`${config["host"]}:${config["port"]}`)
@@ -50,6 +51,16 @@ fn route(conn, req, config, store, live_state) {
     if path == "/api/glossary" {
         let g = gloss.glossary()
         return http_util.write_json(conn, 200, g)
+    }
+
+    if path == "/api/leaders" {
+        let q = req["query"]
+        let stat = q["stat"] ?? ""
+        let limit = parse_int(q["limit"] ?? "") ?? 5
+        if stat == "" {
+            return http_util.write_json(conn, 200, leaders.summary(store))
+        }
+        return http_util.write_json(conn, 200, { "stat": stat, "rows": leaders.top_for(store, stat, limit) })
     }
 
     if http_util.path_starts_with(path, "/api/players/") {

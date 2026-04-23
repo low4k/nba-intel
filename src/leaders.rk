@@ -1,0 +1,86 @@
+import "players.rk" as players
+
+fn star_ids() {
+    [
+        "1966",    // LeBron James
+        "3112335", // Nikola Jokic
+        "3032977", // Giannis Antetokounmpo
+        "3945274", // Luka Doncic
+        "4278073", // Shai Gilgeous-Alexander
+        "4065648", // Jayson Tatum
+        "3975",    // Stephen Curry
+        "4594268", // Anthony Edwards
+        "5104157", // Victor Wembanyama
+        "4396993", // Tyrese Haliburton
+        "3202"     // Kevin Durant
+    ]
+}
+
+fn stat_value(p, stat) {
+    let t = p["traditional"] ?? {}
+    if stat == "PTS" { return t["pts"] ?? 0 }
+    if stat == "REB" { return t["reb"] ?? 0 }
+    if stat == "AST" { return t["ast"] ?? 0 }
+    if stat == "STL" { return t["stl"] ?? 0 }
+    if stat == "BLK" { return t["blk"] ?? 0 }
+    0
+}
+
+fn top_for(store, stat, limit) {
+    let ids = leaders.star_ids()
+    let mut rows = []
+    for id in ids {
+        try {
+            let p = players.get(store, id)
+            if p == nil { continue }
+            if (p["name"] ?? "") == "" { continue }
+            push(rows, {
+                "id":   p["id"] ?? id,
+                "name": p["name"] ?? "",
+                "team": p["team"] ?? "",
+                "value": leaders.stat_value(p, stat)
+            })
+        } catch (e) {
+            log.warn(`leaders: player ${id}: ${e}`)
+        }
+    }
+    leaders.sort_desc_by_value(rows)
+    if len(rows) > limit { rows = leaders.take(rows, limit) }
+    rows
+}
+
+fn sort_desc_by_value(rows) {
+    let n = len(rows)
+    let mut i = 0
+    while i < n {
+        let mut j = i + 1
+        while j < n {
+            if (rows[j])["value"] > (rows[i])["value"] {
+                let tmp = rows[i]
+                rows[i] = rows[j]
+                rows[j] = tmp
+            }
+            j = j + 1
+        }
+        i = i + 1
+    }
+    rows
+}
+
+fn take(arr, n) {
+    let mut out = []
+    let mut i = 0
+    while i < n and i < len(arr) {
+        push(out, arr[i])
+        i = i + 1
+    }
+    out
+}
+
+fn summary(store) {
+    {
+        "pts": leaders.top_for(store, "PTS", 5),
+        "reb": leaders.top_for(store, "REB", 5),
+        "ast": leaders.top_for(store, "AST", 5)
+    }
+}

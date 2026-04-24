@@ -83,7 +83,12 @@ pub fn decode_hex(hh) {
 
 pub fn write_response(conn, status, body, content_type) {
     let status_text = http_util.status_phrase(status)
-    let head = `HTTP/1.1 ${status} ${status_text}\r\nContent-Type: ${content_type}\r\nContent-Length: ${len(body)}\r\nCache-Control: no-cache, no-store, must-revalidate\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n`
+    // NOTE: deliberately omit Content-Length. Rock's len() returns the
+    // character count, not the byte count, so any response containing
+    // multi-byte UTF-8 (e.g. en-dash "—", "·", "×" in our web assets)
+    // would be truncated by the browser. We set Connection: close so the
+    // client frames the body by EOF instead.
+    let head = `HTTP/1.1 ${status} ${status_text}\r\nContent-Type: ${content_type}\r\nCache-Control: no-cache, no-store, must-revalidate\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n`
     net.write(conn, head + body)
 }
 

@@ -792,3 +792,60 @@ img.face {
 .tm-leader .rle { font-size: 10px; color: var(--muted); letter-spacing: .6px; text-transform: uppercase; }
 .tm-leader .stat { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); }
 .tm-leader .stat small { display: block; font-size: 10px; color: var(--muted); text-align: right; font-weight: 500; }
+
+/* ---------- v8 team page — splits / recent / upcoming / best-worst ---------- */
+.tm-sec-h { font-size: 11px; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; margin: 14px 0 6px; font-weight: 700; }
+
+.tm-splits { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.tm-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--bg-2); font-size: 12px;
+}
+.tm-pill .k { font-size: 10px; letter-spacing: .8px; color: var(--muted); text-transform: uppercase; }
+.tm-pill .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+.tm-pill.good { border-color: rgba(63,185,80,.5); }
+.tm-pill.good .v { color: var(--good); }
+.tm-pill.bad { border-color: rgba(248,81,73,.5); }
+.tm-pill.bad .v { color: var(--bad); }
+
+.tm-bestworst { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+@media (max-width: 640px) { .tm-bestworst { grid-template-columns: 1fr; } }
+.tm-gamecard {
+  padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
+  background: linear-gradient(180deg, var(--bg-2), var(--bg));
+}
+.tm-gamecard.best  { border-left: 3px solid var(--good); }
+.tm-gamecard.worst { border-left: 3px solid var(--bad); }
+.tm-gamecard .k { font-size: 10px; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; font-weight: 700; }
+.tm-gamecard .row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.tm-gamecard .mini-logo { width: 22px; height: 22px; object-fit: contain; }
+.tm-gamecard .opp { font-weight: 600; font-size: 13px; }
+.tm-gamecard .score { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 14px; }
+.tm-gamecard.best  .marg { color: var(--good); font-weight: 800; font-variant-numeric: tabular-nums; font-size: 13px; }
+.tm-gamecard.worst .marg { color: var(--bad);  font-weight: 800; font-variant-numeric: tabular-nums; font-size: 13px; }
+.tm-gamecard .dt { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.tm-section { margin-top: 10px; }
+.tm-recent { display: flex; gap: 6px; flex-wrap: wrap; }
+.tm-rbox {
+  width: 46px; height: 46px; border-radius: 8px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 1px solid var(--border); background: var(--bg-2); cursor: default;
+}
+.tm-rbox.w { background: rgba(63,185,80,.18);  border-color: rgba(63,185,80,.45); }
+.tm-rbox.l { background: rgba(248,81,73,.16); border-color: rgba(248,81,73,.45); }
+.tm-rbox .rl { font-size: 13px; font-weight: 800; }
+.tm-rbox.w .rl { color: var(--good); }
+.tm-rbox.l .rl { color: var(--bad); }
+.tm-rbox .ro { font-size: 9px; color: var(--muted); letter-spacing: .5px; }
+
+.tm-upcoming { display: flex; gap: 8px; flex-wrap: wrap; }
+.tm-ubox {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg-2); font-size: 12px;
+}
+.tm-ubox .ud { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tm-ubox .mini-logo { width: 18px; height: 18px; object-fit: contain; }
+.tm-ubox .uo { font-weight: 600; }

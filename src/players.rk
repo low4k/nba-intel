@@ -5,7 +5,9 @@ import "sources/espn.rk" as espn
 
 fn get(store, player_id) {
     let cache_key = `player:${player_id}`
-    let cached = db.cache_get(store, cache_key, 300_000)
+    // 10 min — box scores only change at game time, so a longer TTL is safe
+    // and cuts ESPN traffic for the dashboard / leader-click flow.
+    let cached = db.cache_get(store, cache_key, 600_000)
     if cached != nil { return cached }
 
     let mut p = norm.empty_player()

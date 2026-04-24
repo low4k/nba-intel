@@ -35,6 +35,18 @@ fn team_roster(team_abbr) {
     }
 }
 
+fn team_schedule(team_abbr) {
+    let url = `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/teams/${strs.lower(team_abbr)}/schedule`
+    try {
+        let resp = http.get(url)
+        if resp["status"] != 200 { return nil }
+        return json.parse(resp["body"])
+    } catch (e) {
+        log.warn(`espn schedule ${team_abbr}: ${e}`)
+        return nil
+    }
+}
+
 fn standings() {
     let url = "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings"
     try {

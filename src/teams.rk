@@ -18,14 +18,20 @@ fn empty_team() {
             "net_rating": nil,
             "pace": nil
         },
-        "splits": { "home": {}, "away": {}, "last_5": {}, "last_10": {} },
+        "splits": { "home": {}, "away": {}, "last_5": {}, "last_10": {}, "streak": "" },
+        "recent": [],
+        "upcoming": [],
+        "next_game": nil,
+        "best_win": nil,
+        "worst_loss": nil,
         "sources_used": []
     }
 }
 
 fn get(store, team_id) {
     let key = `team:${team_id}`
-    let cached = db.cache_get(store, key, 300_000)
+    // Teams barely change intra-day — 30 min is safe and cuts ESPN load.
+    let cached = db.cache_get(store, key, 1_800_000)
     if cached != nil { return cached }
 
     let mut t = teams.empty_team()
@@ -36,6 +42,7 @@ fn get(store, team_id) {
 
     t = teams.enrich_from_espn(t, parts["abbr"])
     t = teams.enrich_from_nba_official(t, parts["abbr"], parts["year"])
+    t = teams.enrich_schedule(t, parts["abbr"])
 
     db.cache_put(store, key, t)
     t
@@ -107,4 +114,157 @@ fn enrich_from_nba_official(team, abbr, year) {
         log.warn(`teams: nba_official enrich failed: ${e}`)
     }
     team
+}
+
+fn enrich_schedule(team, abbr) {
+    let data_ = espn.team_schedule(abbr)
+    if data_ == nil { return team }
+    teams.record_source(team, "espn_schedule")
+    let events = data_["events"] ?? []
+
+    let mut home_w = 0; let mut home_l = 0
+    let mut away_w = 0; let mut away_l = 0
+    let mut l10_w = 0;  let mut l10_l = 0
+    let mut l5_w = 0;   let mut l5_l = 0
+    let mut l10_pf = 0; let mut l10_pa = 0
+    let mut finished = []     // collected Final games (most recent first on output)
+    let mut upcoming = []     // future / scheduled games
+    let mut best = nil        // biggest positive margin win
+    let mut worst = nil       // biggest negative margin loss
+
+    let is_upper = abbr
+    let wanted = strs.upper(abbr)
+
+    for ev in events {
+        let comps = (ev["competitions"] ?? [nil])[0] ?? {}
+        let competitors = comps["competitors"] ?? []
+        if len(competitors) < 2 { continue }
+        let mut us = nil
+        let mut opp = nil
+        for c in competitors {
+            let tabbr = strs.upper(((c["team"] ?? {})["abbreviation"]) ?? "")
+            if tabbr == wanted { us = c } else { opp = c }
+        }
+        if us == nil or opp == nil { continue }
+        let status = ((comps["status"] ?? {})["type"] ?? {})
+        let desc = status["description"] ?? ""
+        let completed = status["completed"] ?? false
+        let us_home = (us["homeAway"] ?? "") == "home"
+        let us_score = ((us["score"] ?? {})["value"]) ?? nil
+        let opp_score = ((opp["score"] ?? {})["value"]) ?? nil
+        let opp_abbr = ((opp["team"] ?? {})["abbreviation"]) ?? ""
+        let opp_name = ((opp["team"] ?? {})["displayName"]) ?? opp_abbr
+        let date = ev["date"] ?? ""
+
+        if completed and us_score != nil and opp_score != nil {
+            let won = us_score > opp_score
+            let margin = us_score - opp_score
+            let rec = {
+                "date":     date,
+                "opp":      opp_abbr,
+                "opp_name": opp_name,
+                "home":     us_home,
+                "us":       us_score,
+                "them":     opp_score,
+                "result":   if won { "W" } else { "L" },
+                "margin":   margin
+            }
+            push(finished, rec)
+            if us_home {
+                if won { home_w = home_w + 1 } else { home_l = home_l + 1 }
+            } else {
+                if won { away_w = away_w + 1 } else { away_l = away_l + 1 }
+            }
+            if won and (best == nil or margin > best["margin"]) { best = rec }
+            if (not won) and (worst == nil or margin < worst["margin"]) { worst = rec }
+        } else {
+            push(upcoming, {
+                "date":     date,
+                "opp":      opp_abbr,
+                "opp_name": opp_name,
+                "home":     us_home,
+                "status":   desc
+            })
+        }
+    }
+
+    // Finished games come chronologically; take last 10 for L10, last 5 for L5.
+    let n = len(finished)
+    let mut i = if n > 10 { n - 10 } else { 0 }
+    while i < n {
+        let g = finished[i]
+        if g["result"] == "W" { l10_w = l10_w + 1 } else { l10_l = l10_l + 1 }
+        l10_pf = l10_pf + g["us"]
+        l10_pa = l10_pa + g["them"]
+        i = i + 1
+    }
+    let m = if n > 5 { n - 5 } else { 0 }
+    let mut j = m
+    while j < n {
+        let g = finished[j]
+        if g["result"] == "W" { l5_w = l5_w + 1 } else { l5_l = l5_l + 1 }
+        j = j + 1
+    }
+
+    // Current streak from finished tail.
+    let mut streak_type = ""
+    let mut streak_count = 0
+    let mut k = n - 1
+    while k >= 0 {
+        let r = finished[k]["result"]
+        if streak_type == "" { streak_type = r; streak_count = 1 }
+        else if r == streak_type { streak_count = streak_count + 1 }
+        else { break }
+        k = k - 1
+    }
+    let streak = if streak_count == 0 { "" } else { `${streak_type}${streak_count}` }
+
+    // Recent = last 10 finished games in reverse-chrono order.
+    let mut recent = []
+    let start = if n > 10 { n - 10 } else { 0 }
+    let mut r_i = n - 1
+    while r_i >= start {
+        push(recent, finished[r_i])
+        r_i = r_i - 1
+    }
+    // Upcoming — cap to next 5.
+    let mut up5 = []
+    let mut u = 0
+    while u < len(upcoming) and u < 5 {
+        push(up5, upcoming[u])
+        u = u + 1
+    }
+
+    team["splits"] = {
+        "home":   { "w": home_w, "l": home_l },
+        "away":   { "w": away_w, "l": away_l },
+        "last_5": { "w": l5_w, "l": l5_l },
+        "last_10":{
+            "w": l10_w,
+            "l": l10_l,
+            "ppg":  if l10_w + l10_l > 0 { l10_pf / (l10_w + l10_l) } else { 0 },
+            "oppg": if l10_w + l10_l > 0 { l10_pa / (l10_w + l10_l) } else { 0 }
+        },
+        "streak": streak
+    }
+    team["recent"] = recent
+    team["upcoming"] = up5
+    team["next_game"] = if len(up5) > 0 { up5[0] } else { nil }
+    team["best_win"] = best
+    team["worst_loss"] = worst
+    team
+}
+
+// Pre-warm caches so the first real page-view is instant. Called from
+// main.rk at boot on a separate fiber so it doesn't block `listen`.
+fn prewarm(store) {
+    log.info("prewarm: fetching 30 teams + top leaders...")
+    let abbrs = ["ATL","BOS","BKN","CHA","CHI","CLE","DAL","DEN","DET","GSW",
+                 "HOU","IND","LAC","LAL","MEM","MIA","MIL","MIN","NOP","NYK",
+                 "OKC","ORL","PHI","PHX","POR","SAC","SAS","TOR","UTA","WAS"]
+    let season = "2026"
+    for ab in abbrs {
+        try { teams.get(store, `${ab}-${season}`) } catch (e) { log.warn(`prewarm team ${ab}: ${e}`) }
+    }
+    log.info("prewarm: teams done")
 }

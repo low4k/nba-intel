@@ -610,13 +610,104 @@ async function loadTeam(id) {
     const t = await api('/api/teams/' + encodeURIComponent(id));
     const logo = teamLogo(t.abbr);
     const r = t.ratings || {};
-    const ratings = [
-      ['OFF', r.off_rating], ['DEF', r.def_rating], ['NET', r.net_rating], ['PACE', r.pace],
-    ].filter(([,v]) => v != null);
-    const ratingsHtml = ratings.length
-      ? `<div class="stat-grid">${ratings.map(([lbl, v]) =>
-          `<div class="stat-box"><div class="lbl">${lbl}</div><div class="val">${typeof v === 'number' ? v.toFixed(1) : v}</div></div>`
+    const splits = t.splits || {};
+    const recent = t.recent || [];
+    const upcoming = t.upcoming || [];
+    const best = t.best_win;
+    const worst = t.worst_loss;
+
+    // --- ratings tiles ---
+    // League-avg anchors: OFF/DEF ~114, NET 0, PACE 100. Good/bad class
+    // flips based on whether higher is better.
+    function ratingClass(key, v) {
+      if (v == null) return '';
+      if (key === 'off_rating') return v >= 116 ? 'good' : (v <= 110 ? 'bad' : '');
+      if (key === 'def_rating') return v <= 110 ? 'good' : (v >= 116 ? 'bad' : '');
+      if (key === 'net_rating') return v >= 3 ? 'good' : (v <= -3 ? 'bad' : '');
+      return '';
+    }
+    const ratingDefs = [
+      ['OFF',  'off_rating', r.off_rating, r.off_rank],
+      ['DEF',  'def_rating', r.def_rating, r.def_rank],
+      ['NET',  'net_rating', r.net_rating, r.net_rank],
+      ['PACE', 'pace',       r.pace,       r.pace_rank],
+    ].filter(x => x[2] != null);
+    const ratingsHtml = ratingDefs.length
+      ? `<div class="tm-ratings">${ratingDefs.map(([lbl, key, v, rk]) =>
+          `<div class="tm-rating ${ratingClass(key, v)}">
+             <div class="lbl">${lbl}</div>
+             <div class="val">${typeof v === 'number' ? v.toFixed(1) : v}</div>
+             ${rk ? `<div class="rk">#${escHtml(String(rk))}</div>` : ''}
+           </div>`
         ).join('')}</div>` : '';
+
+    // --- splits pills row ---
+    function wl(o) { return o ? `${o.w || 0}-${o.l || 0}` : '0-0'; }
+    const streakClass = (splits.streak || '').startsWith('W') ? 'good'
+      : (splits.streak || '').startsWith('L') ? 'bad' : '';
+    const splitsHtml = `
+      <div class="tm-splits">
+        <div class="tm-pill"><span class="k">HOME</span><span class="v">${wl(splits.home)}</span></div>
+        <div class="tm-pill"><span class="k">AWAY</span><span class="v">${wl(splits.away)}</span></div>
+        <div class="tm-pill"><span class="k">L5</span><span class="v">${wl(splits.last_5)}</span></div>
+        <div class="tm-pill"><span class="k">L10</span><span class="v">${wl(splits.last_10)}${
+            splits.last_10 && splits.last_10.ppg ? ` · ${splits.last_10.ppg}-${splits.last_10.oppg}` : ''
+          }</span></div>
+        ${splits.streak ? `<div class="tm-pill ${streakClass}"><span class="k">STREAK</span><span class="v">${escHtml(splits.streak)}</span></div>` : ''}
+      </div>`;
+
+    // --- best / worst cards ---
+    function gameCard(g, kind) {
+      if (!g) return '';
+      const d = (g.date || '').slice(5, 10).replace('-', '/');
+      const arrow = g.home ? 'vs' : '@';
+      const marg = g.margin > 0 ? `+${g.margin}` : String(g.margin);
+      return `
+        <div class="tm-gamecard ${kind}">
+          <div class="k">${kind === 'best' ? 'BEST WIN' : 'WORST LOSS'}</div>
+          <div class="row">
+            <img class="mini-logo" src="${teamLogo(g.opp)}" onerror="${onImgFail}">
+            <div class="opp">${arrow} ${escHtml(g.opp)}</div>
+            <div class="score">${g.us}-${g.them}</div>
+            <div class="marg">${marg}</div>
+          </div>
+          <div class="dt">${escHtml(d)}</div>
+        </div>`;
+    }
+    const bwHtml = (best || worst)
+      ? `<div class="tm-bestworst">${gameCard(best, 'best')}${gameCard(worst, 'worst')}</div>` : '';
+
+    // --- recent 10 strip ---
+    const recentHtml = recent.length ? `
+      <div class="tm-section">
+        <div class="tm-sec-h">LAST ${recent.length}</div>
+        <div class="tm-recent">
+          ${recent.map(g => `
+            <div class="tm-rbox ${g.result === 'W' ? 'w' : 'l'}" title="${escHtml(g.date || '')} ${g.home ? 'vs' : '@'} ${escHtml(g.opp)} ${g.us}-${g.them}">
+              <div class="rl">${g.result}</div>
+              <div class="ro">${g.home ? 'vs' : '@'}${escHtml(g.opp)}</div>
+            </div>`).join('')}
+        </div>
+      </div>` : '';
+
+    // --- upcoming 5 strip ---
+    const upcomingHtml = upcoming.length ? `
+      <div class="tm-section">
+        <div class="tm-sec-h">NEXT ${upcoming.length}</div>
+        <div class="tm-upcoming">
+          ${upcoming.map(g => {
+            const d = (g.date || '').slice(5, 10).replace('-', '/');
+            return `
+              <div class="tm-ubox">
+                <div class="ud">${escHtml(d)}</div>
+                <img class="mini-logo" src="${teamLogo(g.opp)}" onerror="${onImgFail}">
+                <div class="uo">${g.home ? 'vs' : '@'} ${escHtml(g.opp)}</div>
+              </div>`;
+          }).join('')}
+        </div>
+      </div>` : '';
+
+    // --- roster (unchanged shape, v7 face fallback) ---
     const roster = (t.roster || []).map(pl => `
       <div class="roster-card" data-player-id="${escHtml(pl.id)}" data-player-name="${escHtml(pl.name || '')}">
         <img class="face" src="${pl.headshot || headshot(pl.id)}" onerror="${onImgFail}" loading="lazy">
@@ -625,6 +716,7 @@ async function loadTeam(id) {
           <div class="meta">${escHtml(pl.position || '')}${pl.jersey ? ' · #'+escHtml(pl.jersey) : ''}${pl.height ? ' · '+escHtml(pl.height) : ''}</div>
         </div>
       </div>`).join('');
+
     out.innerHTML = `
       <div class="team-header" style="--logo:url('${logo}')">
         <div class="logo"></div>
@@ -635,7 +727,11 @@ async function loadTeam(id) {
         <div></div>
       </div>
       ${ratingsHtml}
-      <h3 style="margin:12px 0 8px;font-size:13px;letter-spacing:.5px;color:var(--muted)">ROSTER</h3>
+      ${splitsHtml}
+      ${bwHtml}
+      ${recentHtml}
+      ${upcomingHtml}
+      <h3 class="tm-sec-h" style="margin-top:14px">ROSTER</h3>
       <div class="roster-grid">${roster || '<div class="muted">no roster loaded</div>'}</div>
       ${(t.sources_used && t.sources_used.length)
         ? `<div style="margin-top:10px"><span class="chip">sources: ${t.sources_used.map(escHtml).join(', ')}</span></div>` : ''}

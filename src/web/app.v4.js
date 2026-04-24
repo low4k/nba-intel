@@ -253,14 +253,52 @@ function openPlayer(id) {
   loadPlayer(id);
 }
 
+// Aggregate raw totals from a game log slice to derive advanced metrics.
+function aggGames(games) {
+  const a = { n:0, min:0, pts:0, fgm:0, fga:0, fg3m:0, fg3a:0, ftm:0, fta:0, reb:0, ast:0, stl:0, blk:0, tov:0 };
+  games.forEach(g => {
+    a.n++; a.min += g.minutes||0;
+    a.pts += g.pts||0; a.fgm += g.fgm||0; a.fga += g.fga||0;
+    a.fg3m += g.fg3m||0; a.fg3a += g.fg3a||0; a.ftm += g.ftm||0; a.fta += g.fta||0;
+    a.reb += g.reb||0; a.ast += g.ast||0; a.stl += g.stl||0; a.blk += g.blk||0; a.tov += g.tov||0;
+  });
+  return a;
+}
+function deriveEfficiency(agg) {
+  if (!agg.n) return null;
+  const ts  = agg.fga || agg.fta ? agg.pts / (2 * (agg.fga + 0.44 * agg.fta)) : 0;
+  const efg = agg.fga ? (agg.fgm + 0.5 * agg.fg3m) / agg.fga : 0;
+  const ato = agg.tov ? agg.ast / agg.tov : agg.ast;
+  return {
+    ts_pct: ts * 100,
+    efg_pct: efg * 100,
+    ast_to: ato,
+    pra_avg: (agg.pts + agg.reb + agg.ast) / agg.n,
+    mpg: agg.min / agg.n,
+  };
+}
+function careerHighs(games) {
+  if (!games.length) return null;
+  const max = (fn) => games.reduce((m, g) => (fn(g) > m.v ? { v: fn(g), g } : m), { v: -Infinity, g: null });
+  const p = max(g => g.pts||0), r = max(g => g.reb||0), a = max(g => g.ast||0), t3 = max(g => g.fg3m||0);
+  return { pts: p, reb: r, ast: a, fg3m: t3 };
+}
+function fmtOpp(g) {
+  if (!g) return '';
+  return `${g.venue === 'away' ? '@' : 'vs'} ${g.opponent || ''}${g.game_date ? ' · ' + g.game_date.slice(0,10) : ''}`;
+}
+
 async function loadPlayer(id) {
   const out = document.getElementById('player-out');
-  out.innerHTML = '<div class="skeleton" style="height:100px"></div>';
+  out.innerHTML = '<div class="skeleton" style="height:120px"></div><div class="skeleton" style="height:60px;margin-top:8px"></div><div class="skeleton" style="height:300px;margin-top:8px"></div>';
   try {
     const p = await api('/api/players/' + encodeURIComponent(id));
     const face = faceOf({ id, ...p });
     const logo = teamLogo(p.team);
     const t = p.traditional || {};
+    const games = p.game_log || [];
+
+    // --- season averages (big stat cards) ---
     const stats = [
       ['PTS', t.pts], ['REB', t.reb], ['AST', t.ast],
       ['STL', t.stl], ['BLK', t.blk], ['TOV', t.tov],
@@ -274,7 +312,7 @@ async function loadPlayer(id) {
       return `<div class="stat-box"><div class="lbl">${lbl}</div><div class="val">${display}</div></div>`;
     }).join('');
 
-    // --- bio grid: EVERYTHING we know about this player ---
+    // --- bio grid: EVERYTHING ESPN gives us ---
     const bioFields = [
       ['Team',       p.team_name || p.team],
       ['Position',   p.position_full || p.position],
@@ -297,23 +335,71 @@ async function loadPlayer(id) {
         ).join('')}</div>`
       : '';
 
+    // --- advanced / derived efficiency (last 10 games) ---
+    const l10 = games.slice(-10);
+    const eff = deriveEfficiency(aggGames(l10));
+    const adv = p.advanced || {};
+    const advFields = [];
+    if (eff) {
+      advFields.push(['TS%',     eff.ts_pct.toFixed(1) + '%']);
+      advFields.push(['eFG%',    eff.efg_pct.toFixed(1) + '%']);
+      advFields.push(['AST/TO',  eff.ast_to.toFixed(2)]);
+      advFields.push(['PRA avg', eff.pra_avg.toFixed(1)]);
+      advFields.push(['MPG',     eff.mpg.toFixed(1)]);
+    }
+    if (adv.per  > 0) advFields.push(['PER',  adv.per.toFixed(1)]);
+    if (adv.usg_pct > 0) advFields.push(['USG%', (adv.usg_pct * (adv.usg_pct < 1 ? 100 : 1)).toFixed(1) + '%']);
+    if (adv.bpm != 0 && adv.bpm != null) advFields.push(['BPM', adv.bpm.toFixed(1)]);
+    const advHtml = advFields.length
+      ? `<div class="stat-grid">${advFields.map(([lbl, v]) =>
+          `<div class="stat-box accent"><div class="lbl">${lbl}</div><div class="val">${escHtml(v)}</div></div>`
+        ).join('')}</div>`
+      : '';
+
+    // --- career-season highs ---
+    const ch = careerHighs(games);
+    const chHtml = ch
+      ? `<div class="highs-row">
+          <div class="high"><span class="lbl">Season-high PTS</span><span class="val">${ch.pts.v}</span><span class="ctx">${escHtml(fmtOpp(ch.pts.g))}</span></div>
+          <div class="high"><span class="lbl">Season-high REB</span><span class="val">${ch.reb.v}</span><span class="ctx">${escHtml(fmtOpp(ch.reb.g))}</span></div>
+          <div class="high"><span class="lbl">Season-high AST</span><span class="val">${ch.ast.v}</span><span class="ctx">${escHtml(fmtOpp(ch.ast.g))}</span></div>
+          <div class="high"><span class="lbl">Most 3PM</span><span class="val">${ch.fg3m.v}</span><span class="ctx">${escHtml(fmtOpp(ch.fg3m.g))}</span></div>
+        </div>`
+      : '';
+
     const pinned = pinnedIds().includes(String(id));
-    const shortSub = [p.team, p.position, p.jersey ? '#' + p.jersey : '', p.height_display, p.weight_display]
+    const shortSub = [p.team, p.position_full || p.position, p.jersey ? '#' + p.jersey : '', p.height_display, p.weight_display]
       .filter(x => x).join(' · ');
 
-    // --- inline mini-projection: pick a stat, show band ---
-    const miniPred = `
-      <div class="mini-pred">
-        <div class="mini-pred-head">
-          <span>Next-game projection</span>
-          <select id="mini-pred-stat">
-            <option>PTS</option><option>REB</option><option>AST</option>
-            <option>PRA</option><option>PR</option><option>PA</option><option>RA</option>
-            <option>STL</option><option>BLK</option>
-          </select>
-          <button class="ghost" id="mini-pred-open">open full predictor →</button>
+    // --- full projection card (chart + controls + chips) ---
+    const projCard = `
+      <div class="proj-card">
+        <div class="proj-head">
+          <span class="proj-title">Next-game projection</span>
+          <div class="proj-controls">
+            <select id="proj-stat" title="stat">
+              <option>PTS</option><option>REB</option><option>AST</option>
+              <option>PRA</option><option>PR</option><option>PA</option><option>RA</option>
+              <option>STL</option><option>BLK</option><option>TOV</option>
+              <option>FG_PCT</option><option>FG3_PCT</option>
+            </select>
+            <select id="proj-range" title="sample window">
+              <option value="L5">last 5</option>
+              <option value="L10" selected>last 10</option>
+              <option value="L15">last 15</option>
+              <option value="season">season</option>
+            </select>
+            <label class="inline-num" title="opponent defensive rating">
+              opp DRtg <input id="proj-opp" type="number" value="113" step="0.5" style="width:62px">
+            </label>
+            <label class="inline-num" title="days of rest">
+              rest <input id="proj-rest" type="number" value="1" min="0" style="width:46px">
+            </label>
+            <label class="inline-chk" title="drop blowouts"><input id="proj-garbage" type="checkbox" checked> no garbage</label>
+          </div>
         </div>
-        <div id="mini-pred-body"><div class="muted">loading…</div></div>
+        <canvas id="proj-chart" width="920" height="260"></canvas>
+        <div id="proj-chips"></div>
       </div>`;
 
     out.innerHTML = `
@@ -331,11 +417,14 @@ async function loadPlayer(id) {
       ${bioHtml}
       <h3 class="section-h">SEASON AVERAGES</h3>
       <div class="stat-grid">${statGrid || '<div class="muted">no season stats yet</div>'}</div>
-      ${miniPred}
-      ${renderGameLog(p.game_log || [])}
+      ${advHtml ? `<h3 class="section-h">ADVANCED · L10 EFFICIENCY</h3>${advHtml}` : ''}
+      ${chHtml  ? `<h3 class="section-h">SEASON HIGHS</h3>${chHtml}` : ''}
+      ${projCard}
+      ${renderGameLog(games, 15)}
       ${(p.sources_used && p.sources_used.length)
         ? `<div style="margin-top:10px" class="muted"><span class="chip">sources: ${p.sources_used.map(escHtml).join(', ')}</span></div>` : ''}
     `;
+
     document.getElementById('pin-toggle').addEventListener('click', () => {
       const ids = pinnedIds();
       const sid = String(id);
@@ -344,32 +433,39 @@ async function loadPlayer(id) {
       loadPlayer(id);
       refreshPinned();
     });
-    // wire up mini predictor
-    const miniSel = document.getElementById('mini-pred-stat');
-    const miniBody = document.getElementById('mini-pred-body');
-    const runMini = async () => {
-      miniBody.innerHTML = '<div class="muted">projecting…</div>';
+
+    // wire projection card
+    const pStat = document.getElementById('proj-stat');
+    const pRange = document.getElementById('proj-range');
+    const pOpp = document.getElementById('proj-opp');
+    const pRest = document.getElementById('proj-rest');
+    const pGb = document.getElementById('proj-garbage');
+    const pChips = document.getElementById('proj-chips');
+    const runProj = async () => {
+      pChips.innerHTML = '<div class="muted" style="margin-top:10px">projecting…</div>';
       try {
-        const d = await api(`/api/predict/${encodeURIComponent(id)}?stat=${miniSel.value}&garbage=exclude`);
-        miniBody.innerHTML = renderProjectionChips(d, miniSel.value);
+        const params = new URLSearchParams({
+          stat:   pStat.value,
+          range:  pRange.value,
+          opp_drtg: pOpp.value,
+          rest:   pRest.value,
+          garbage: pGb.checked ? 'exclude' : 'include',
+        });
+        const d = await api(`/api/predict/${encodeURIComponent(id)}?${params}`);
+        drawProjection(d, 'proj-chart');
+        pChips.innerHTML = renderProjectionChips(d, pStat.value);
       } catch (e) {
-        miniBody.innerHTML = `<div class="muted">not enough game log to project</div>`;
+        pChips.innerHTML = `<div class="muted">not enough data to project: ${escHtml(e.message)}</div>`;
       }
     };
-    miniSel.addEventListener('change', runMini);
-    document.getElementById('mini-pred-open').addEventListener('click', () => {
-      document.querySelector('nav button[data-tab="predict"]').click();
-      const inp = document.getElementById('pred-id'); if (inp) inp.value = id;
-      document.getElementById('pred-stat').value = miniSel.value;
-      const go = document.getElementById('pred-go'); if (go) go.click();
-    });
-    runMini();
+    [pStat, pRange, pOpp, pRest, pGb].forEach(el => el.addEventListener('change', runProj));
+    runProj();
   } catch (e) {
     out.innerHTML = `<div class="muted">could not load player ${escHtml(id)}: ${escHtml(e.message)}</div>`;
   }
 }
 
-// ------- projection chips (shared by mini predictor + main predict tab) -------
+// ------- projection chips (used inline on the player page) -------
 function renderProjectionChips(d, statLabel) {
   if (!d || !d.samples) return '<div class="muted">no data</div>';
   const pt   = d.next_game_point;
@@ -382,11 +478,12 @@ function renderProjectionChips(d, statLabel) {
   const l5  = series.slice(-5);
   const avg = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : 0;
   const l10Avg = avg(l10), l5Avg = avg(l5);
-  const trend = (l5Avg - l10Avg).toFixed(1);
+  const trend = (l5Avg - l10Avg);
   const trendArrow = l5Avg > l10Avg + 0.1 ? '▲' : (l5Avg < l10Avg - 0.1 ? '▼' : '→');
-  // hit-rate over a common threshold
   const threshold = pt ? Math.round(pt - 0.5) : Math.round(mean || 0);
   const overs = l10.filter(v => v >= threshold + 0.5).length;
+  const ceiling = Math.max(...series);
+  const floor   = Math.min(...series);
   return `
     <div class="pred-chips">
       <div class="chip-card big">
@@ -397,54 +494,65 @@ function renderProjectionChips(d, statLabel) {
       <div class="chip-card">
         <div class="lbl">L5 / L10</div>
         <div class="val">${l5Avg.toFixed(1)} / ${l10Avg.toFixed(1)}</div>
-        <div class="range ${l5Avg > l10Avg ? 'up' : (l5Avg < l10Avg ? 'down' : '')}">${trendArrow} ${trend >= 0 ? '+' : ''}${trend}</div>
+        <div class="range ${trend > 0 ? 'up' : (trend < 0 ? 'down' : '')}">${trendArrow} ${trend >= 0 ? '+' : ''}${trend.toFixed(1)}</div>
       </div>
       <div class="chip-card">
-        <div class="lbl">season mean</div>
+        <div class="lbl">mean · σ</div>
         <div class="val">${mean.toFixed(1)}</div>
-        <div class="range">σ ${sd.toFixed(2)}</div>
+        <div class="range">σ ${sd.toFixed(2)} · n=${d.samples}</div>
       </div>
       <div class="chip-card">
         <div class="lbl">over ${threshold + 0.5}</div>
         <div class="val">${overs}/${l10.length}</div>
         <div class="range">L10 hit rate</div>
       </div>
+      <div class="chip-card">
+        <div class="lbl">floor · ceiling</div>
+        <div class="val">${isFinite(floor) ? floor : '—'} · ${isFinite(ceiling) ? ceiling : '—'}</div>
+        <div class="range">season range</div>
+      </div>
     </div>`;
 }
 
-function renderGameLog(games) {
+function renderGameLog(games, n = 10) {
   if (!games.length) return '';
-  const rows = games.slice(0, 10).map(g => `
+  const rows = games.slice(-n).reverse().map(g => `
     <tr>
       <td>${escHtml(g.game_date || '').slice(0,10)}</td>
       <td>${g.venue === 'away' ? '@' : 'vs'} ${escHtml(g.opponent || '')}</td>
-      <td>${escHtml(g.result || '')} ${escHtml(g.score || '')}</td>
+      <td class="${g.result === 'W' ? 'good' : g.result === 'L' ? 'bad' : ''}">${escHtml(g.result || '')} ${escHtml(g.score || '')}</td>
       <td style="font-variant-numeric:tabular-nums">${(g.minutes||0).toFixed(0)}</td>
       <td style="font-variant-numeric:tabular-nums"><b>${g.pts ?? '—'}</b></td>
       <td style="font-variant-numeric:tabular-nums">${g.reb ?? '—'}</td>
       <td style="font-variant-numeric:tabular-nums">${g.ast ?? '—'}</td>
+      <td style="font-variant-numeric:tabular-nums">${g.stl ?? 0}/${g.blk ?? 0}/${g.tov ?? 0}</td>
       <td style="font-variant-numeric:tabular-nums">${g.fgm ?? ''}-${g.fga ?? ''}</td>
       <td style="font-variant-numeric:tabular-nums">${g.fg3m ?? ''}-${g.fg3a ?? ''}</td>
+      <td style="font-variant-numeric:tabular-nums">${g.ftm ?? ''}-${g.fta ?? ''}</td>
     </tr>`).join('');
   return `
-    <h3 style="margin:12px 0 6px;font-size:13px;letter-spacing:.5px;color:var(--muted)">LAST 10 GAMES</h3>
+    <h3 class="section-h">LAST ${Math.min(n, games.length)} GAMES</h3>
     <div style="overflow-x:auto">
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead><tr style="color:var(--muted);text-align:left">
-        <th style="padding:4px 6px">Date</th><th>Opp</th><th>Result</th>
-        <th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>FG</th><th>3P</th>
+    <table class="log-table">
+      <thead><tr>
+        <th>Date</th><th>Opp</th><th>Result</th>
+        <th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>S/B/TO</th><th>FG</th><th>3P</th><th>FT</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
 }
 
-document.getElementById('player-load').addEventListener('click', () => {
-  const id = document.getElementById('player-id').value.trim();
-  if (id) loadPlayer(id);
-});
-document.getElementById('player-id').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('player-load').click();
-});
+// enter key on player search input still submits (though autocomplete also loads on pick)
+(function wirePlayerInput() {
+  const inp = document.getElementById('player-id');
+  if (!inp) return;
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const v = inp.value.trim();
+      if (/^\d+$/.test(v)) loadPlayer(v);
+    }
+  });
+})();
 
 // ---------- team tab ----------
 function renderTeamGrid() {
@@ -459,10 +567,7 @@ function renderTeamGrid() {
   host.querySelectorAll('.team-chip').forEach(chip => chip.addEventListener('click', () => {
     host.querySelectorAll('.team-chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
-    const id = `${chip.dataset.abbr}-${SEASON}`;
-    const inp = document.getElementById('team-id');
-    if (inp) inp.value = id;
-    loadTeam(id);
+    loadTeam(`${chip.dataset.abbr}-${SEASON}`);
   }));
 }
 
@@ -511,105 +616,119 @@ async function loadTeam(id) {
   }
 }
 
-document.getElementById('team-load').addEventListener('click', () => {
-  const id = document.getElementById('team-id').value.trim();
-  if (id) loadTeam(id);
-});
-document.getElementById('team-id').addEventListener('keydown', e => {
-  if (e.key === 'Enter') document.getElementById('team-load').click();
-});
+document.getElementById('team-grid'); // presence check only
 
-// ---------- predict ----------
-const predBtn = document.getElementById('pred-go') || (() => {
-  const b = document.createElement('button');
-  b.id = 'pred-go';
-  b.textContent = 'Project';
-  b.className = 'primary';
-  b.style.marginTop = '6px';
-  document.querySelector('section[data-panel="predict"] .card').appendChild(b);
-  return b;
-})();
-predBtn.addEventListener('click', async () => {
-  const id = document.getElementById('pred-id').value.trim();
-  if (!id) return;
-  const params = new URLSearchParams({
-    stat: document.getElementById('pred-stat').value,
-    min: document.getElementById('pred-min').value,
-    garbage: document.getElementById('pred-garbage').checked ? 'exclude' : 'include',
-    opp_drtg: document.getElementById('pred-opp').value,
-    rest: document.getElementById('pred-rest').value,
-  });
-  try {
-    const data = await api(`/api/predict/${encodeURIComponent(id)}?${params}`);
-    drawProjection(data);
-    const sum = document.getElementById('pred-summary');
-    sum.innerHTML = renderProjectionChips(data, document.getElementById('pred-stat').value);
-  } catch (e) {
-    document.getElementById('pred-summary').innerHTML = `<div class="muted">could not project: ${escHtml(e.message)}</div>`;
-  }
-});
-
-function drawProjection(data) {
-  const canvas = document.getElementById('pred-chart');
+// ---------- projection chart ----------
+function drawProjection(data, canvasId = 'proj-chart') {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
   const ctx = canvas.getContext('2d');
+  // Retina crispness
+  const dpr = window.devicePixelRatio || 1;
+  if (canvas.width !== canvas.clientWidth * dpr) {
+    canvas.width  = canvas.clientWidth  * dpr;
+    canvas.height = canvas.clientHeight * dpr;
+  }
   const cs = getComputedStyle(document.body);
-  const accent = cs.getPropertyValue('--accent').trim() || '#f97316';
+  const accent  = cs.getPropertyValue('--accent').trim()   || '#ff6b1a';
   const accent2 = cs.getPropertyValue('--accent-2').trim() || '#38bdf8';
-  const border = cs.getPropertyValue('--border').trim() || '#30363d';
-  const muted = cs.getPropertyValue('--muted').trim() || '#8d96a0';
-  const bad = cs.getPropertyValue('--bad').trim() || '#f85149';
+  const border  = cs.getPropertyValue('--border').trim()   || '#253041';
+  const muted   = cs.getPropertyValue('--muted').trim()    || '#8a96a8';
+  const bad     = cs.getPropertyValue('--bad').trim()      || '#f85149';
+  const text    = cs.getPropertyValue('--text').trim()     || '#e7ecf3';
 
   const w = canvas.width, h = canvas.height;
   ctx.clearRect(0, 0, w, h);
-  const series = data.series || []; const smoothed = data.smoothed || [];
-  if (!series.length) return;
-  const padL = 40, padR = 20, padT = 18, padB = 30;
+  const series   = data.series   || [];
+  const smoothed = data.smoothed || [];
+  if (!series.length) {
+    ctx.fillStyle = muted; ctx.font = `${13*dpr}px system-ui, sans-serif`;
+    ctx.fillText('no game log yet', 20*dpr, 30*dpr);
+    return;
+  }
+  const padL = 44*dpr, padR = 22*dpr, padT = 22*dpr, padB = 30*dpr;
   const innerW = w - padL - padR, innerH = h - padT - padB;
-  const max = Math.max(...series, ...smoothed, data.next_game_high || 0) * 1.1 + 1;
-  const min = Math.min(0, ...series, ...smoothed, data.next_game_low || 0);
+  const ghHigh = data.next_game_high || 0;
+  const ghLow  = data.next_game_low  || 0;
+  const max = Math.max(...series, ...(smoothed.length ? smoothed : [0]), ghHigh) * 1.12 + 1;
+  const min = Math.max(0, Math.min(...series, ...(smoothed.length ? smoothed : [0]), ghLow) * 0.92);
   const xstep = innerW / (series.length + 1);
   const yfor = v => padT + innerH - ((v - min) / (max - min)) * innerH;
 
-  ctx.strokeStyle = border; ctx.beginPath();
+  // y-axis grid + labels
+  ctx.strokeStyle = border; ctx.lineWidth = 1*dpr;
+  ctx.fillStyle   = muted; ctx.font = `${10*dpr}px system-ui, sans-serif`;
   for (let i = 0; i <= 4; i++) {
     const y = padT + (innerH / 4) * i;
-    ctx.moveTo(padL, y); ctx.lineTo(w - padR, y);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+    const val = max - (max - min) * (i / 4);
+    ctx.fillText(val.toFixed(val < 10 ? 1 : 0), 6*dpr, y + 4*dpr);
   }
-  ctx.stroke();
 
+  // projection band for next game
   if (data.next_game_low != null && data.next_game_high != null) {
-    ctx.fillStyle = 'rgba(56,189,248,0.18)';
-    const x = padL + xstep * (series.length + 1);
-    ctx.fillRect(x - xstep * 0.4, yfor(data.next_game_high), xstep * 0.8, yfor(data.next_game_low) - yfor(data.next_game_high));
+    const x  = padL + xstep * (series.length + 1);
+    const yH = yfor(data.next_game_high), yL = yfor(data.next_game_low);
+    const grad = ctx.createLinearGradient(0, yH, 0, yL);
+    grad.addColorStop(0, 'rgba(255,107,26,0.35)');
+    grad.addColorStop(1, 'rgba(56,189,248,0.10)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x - xstep * 0.4, yH, xstep * 0.8, yL - yH);
   }
 
-  ctx.strokeStyle = muted; ctx.beginPath();
+  // mean line
+  if (data.mean != null) {
+    ctx.strokeStyle = border; ctx.setLineDash([4*dpr, 4*dpr]); ctx.beginPath();
+    const ym = yfor(data.mean);
+    ctx.moveTo(padL, ym); ctx.lineTo(w - padR, ym); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = muted;
+    ctx.fillText('μ ' + data.mean.toFixed(1), w - padR - 46*dpr, ym - 4*dpr);
+  }
+
+  // raw series (thin)
+  ctx.strokeStyle = muted; ctx.lineWidth = 1.4*dpr; ctx.globalAlpha = 0.7;
+  ctx.beginPath();
   series.forEach((v, i) => {
     const x = padL + xstep * (i + 1), y = yfor(v);
     if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   });
-  ctx.stroke();
+  ctx.stroke(); ctx.globalAlpha = 1;
 
+  // smoothed (bold, accent) with glow
   if (smoothed.length === series.length) {
-    ctx.strokeStyle = accent; ctx.lineWidth = 2; ctx.beginPath();
+    ctx.shadowColor = accent; ctx.shadowBlur = 12*dpr;
+    ctx.strokeStyle = accent; ctx.lineWidth = 2.5*dpr; ctx.beginPath();
     smoothed.forEach((v, i) => {
       const x = padL + xstep * (i + 1), y = yfor(v);
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
-    ctx.stroke(); ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.shadowBlur = 0; ctx.lineWidth = 1*dpr;
   }
 
+  // data points
   series.forEach((v, i) => {
     const x = padL + xstep * (i + 1), y = yfor(v);
-    ctx.fillStyle = accent2; ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = accent2; ctx.beginPath(); ctx.arc(x, y, 3.2*dpr, 0, Math.PI * 2); ctx.fill();
   });
+
+  // next game projected point
   if (data.next_game_point != null) {
     const x = padL + xstep * (series.length + 1), y = yfor(data.next_game_point);
-    ctx.fillStyle = accent; ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = accent;
+    ctx.shadowColor = accent; ctx.shadowBlur = 14*dpr;
+    ctx.beginPath(); ctx.arc(x, y, 6*dpr, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = text; ctx.font = `bold ${12*dpr}px system-ui, sans-serif`;
+    ctx.fillText(data.next_game_point.toFixed(1), x - 14*dpr, y - 10*dpr);
   }
+
+  // anomalies ringed red
   (data.anomalies || []).forEach(a => {
     const x = padL + xstep * (a.index + 1), y = yfor(a.value);
-    ctx.strokeStyle = bad; ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = bad; ctx.lineWidth = 1.6*dpr;
+    ctx.beginPath(); ctx.arc(x, y, 8*dpr, 0, Math.PI * 2); ctx.stroke();
   });
 }
 
@@ -620,54 +739,52 @@ document.getElementById('cmp-go').addEventListener('click', async () => {
   const stat = document.getElementById('cmp-stat').value;
   if (!a || !b) return;
   const out = document.getElementById('cmp-out');
-  out.textContent = '…';
+  out.innerHTML = '<div class="skeleton" style="height:80px"></div>';
   try {
-    const data = await api(`/api/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}&stat=${stat}`);
-    out.textContent = JSON.stringify(data, null, 2);
-  } catch (e) { out.textContent = e.message; }
-});
-
-// ---------- search ----------
-async function doSearch() {
-  const q = document.getElementById('search-q').value.trim();
-  if (!q) return;
-  const out = document.getElementById('search-out');
-  out.innerHTML = '<div class="skeleton"></div>';
-  try {
-    const data = await api('/api/search?q=' + encodeURIComponent(q));
-    const hits = data.players || data.results || [];
-    if (!hits.length && data.answer) {
-      out.innerHTML = `<div class="card" style="margin:0">${escHtml(data.answer)}</div>`;
-      return;
-    }
-    if (!hits.length) {
-      out.innerHTML = '<div class="muted">no matches</div>';
-      return;
-    }
-    out.innerHTML = '<div class="search-results">' + hits.slice(0, 25).map(h => {
-      const id = h.id || h.player_id;
-      return `
-        <div class="search-row" data-player-id="${escHtml(id)}" style="--face:url('${headshot(id)}')">
-          <div class="face"></div>
-          <div>
-            <div style="font-weight:600">${escHtml(h.name || h.displayName || id)}</div>
-            <div class="muted" style="font-size:11px">${escHtml(h.team || '')} ${h.position ? '· ' + escHtml(h.position) : ''}</div>
-          </div>
-          <button class="primary" data-open="${escHtml(id)}">Open</button>
-        </div>`;
-    }).join('') + '</div>';
-    out.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      openPlayer(b.dataset.open);
-    }));
-    out.querySelectorAll('.search-row').forEach(r => r.addEventListener('click', () => {
-      openPlayer(r.dataset.playerId);
-    }));
+    const [pa, pb] = await Promise.all([
+      api('/api/players/' + encodeURIComponent(a)).catch(() => null),
+      api('/api/players/' + encodeURIComponent(b)).catch(() => null),
+    ]);
+    if (!pa || !pb) { out.innerHTML = '<div class="muted">could not load one or both players</div>'; return; }
+    const tA = pa.traditional || {}, tB = pb.traditional || {};
+    const row = (lbl, av, bv, fmt = v => v.toFixed(1)) => {
+      const a2 = typeof av === 'number' ? fmt(av) : (av ?? '—');
+      const b2 = typeof bv === 'number' ? fmt(bv) : (bv ?? '—');
+      const lean = (typeof av === 'number' && typeof bv === 'number') ? (av > bv ? 'a' : av < bv ? 'b' : '') : '';
+      return `<tr>
+        <td class="${lean === 'a' ? 'win' : ''}">${a2}</td>
+        <td class="lbl">${lbl}</td>
+        <td class="${lean === 'b' ? 'win' : ''}">${b2}</td>
+      </tr>`;
+    };
+    const head = (p) => `
+      <div class="cmp-head" style="--face:url('${faceOf(p)}'); --logo:url('${teamLogo(p.team)}')">
+        <div class="avatar"></div>
+        <div class="meta">
+          <div class="name">${escHtml(p.full_name || p.name)}</div>
+          <div class="sub">${escHtml([p.team, p.position, p.height_display].filter(x=>x).join(' · '))}</div>
+        </div>
+      </div>`;
+    out.innerHTML = `
+      <div class="cmp-grid">
+        ${head(pa)}
+        <div></div>
+        ${head(pb)}
+      </div>
+      <table class="cmp-table">
+        ${row('PTS', tA.pts, tB.pts)}
+        ${row('REB', tA.reb, tB.reb)}
+        ${row('AST', tA.ast, tB.ast)}
+        ${row('STL', tA.stl, tB.stl)}
+        ${row('BLK', tA.blk, tB.blk)}
+        ${row('TOV', tA.tov, tB.tov)}
+        ${row('FG%', tA.fg_pct, tB.fg_pct)}
+        ${row('3P%', tA.fg3_pct, tB.fg3_pct)}
+        ${row('FT%', tA.ft_pct, tB.ft_pct)}
+        ${row('MIN', tA.min, tB.min)}
+        ${row('GP',  tA.gp,  tB.gp, v => v.toFixed(0))}
+      </table>`;
   } catch (e) { out.innerHTML = `<div class="muted">${escHtml(e.message)}</div>`; }
-}
-document.getElementById('search-go').addEventListener('click', doSearch);
-document.getElementById('search-q').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doSearch();
 });
 
 // ---------- name autocomplete ----------
@@ -737,11 +854,8 @@ function attachNameSearch(inputEl, onPick) {
   });
 }
 
-// wire name search on the player + predict inputs (they'll load as soon as you pick)
+// wire name search on the player + compare inputs (they'll load as soon as you pick)
 attachNameSearch(document.getElementById('player-id'), (id) => loadPlayer(id));
-attachNameSearch(document.getElementById('pred-id'),   (id) => {
-  const go = document.getElementById('pred-go'); if (go) go.click();
-});
 attachNameSearch(document.getElementById('cmp-a'), () => {});
 attachNameSearch(document.getElementById('cmp-b'), () => {});
 

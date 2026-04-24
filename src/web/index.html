@@ -6,7 +6,7 @@
 <title>NBA Intel</title>
 <link rel="preconnect" href="https://cdn.nba.com" crossorigin>
 <link rel="preconnect" href="https://a.espncdn.com" crossorigin>
-<link rel="stylesheet" href="/static/style.v4.css?v=5">
+<link rel="stylesheet" href="/static/style.v4.css?v=6">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -18,10 +18,7 @@
     <button data-tab="dashboard" class="active">Dashboard</button>
     <button data-tab="player">Player</button>
     <button data-tab="team">Team</button>
-    <button data-tab="predict">Predict</button>
     <button data-tab="compare">Compare</button>
-    <button data-tab="search">Search</button>
-    <button data-tab="live">Live</button>
   </nav>
   <button id="theme-toggle">light</button>
 </header>
@@ -46,94 +43,39 @@
 
   <section data-panel="player">
     <div class="card">
-      <h2>Player profile</h2>
-      <div class="row">
-        <input id="player-id" placeholder="type a player name — e.g. LeBron, SGA, Luka" style="flex:1;min-width:260px">
-        <button id="player-load" class="primary">Load</button>
+      <div class="row" style="margin-bottom:4px">
+        <input id="player-id" placeholder="search any player — e.g. LeBron, SGA, Luka, Wemby" style="flex:1;min-width:260px">
       </div>
       <div class="muted" style="font-size:12px;margin-bottom:10px">
-        start typing a name and pick from the dropdown — or click any leader / roster card anywhere.
+        start typing a name — or click any leader / roster card anywhere on the site.
       </div>
-      <div id="player-out"><div class="muted">type a player name above to see everything we know about them.</div></div>
+      <div id="player-out"><div class="muted">type a player name above to see their full profile, projection, and game log.</div></div>
     </div>
   </section>
 
   <section data-panel="team">
     <div class="card">
-      <h2>Team page</h2>
       <div id="team-grid" class="team-grid" style="margin-bottom:14px"></div>
-      <div class="row">
-        <input id="team-id" placeholder="or type team id (e.g. BOS-2026)">
-        <button id="team-load" class="primary">Load</button>
-      </div>
       <div id="team-out"><div class="muted">pick a team above</div></div>
-    </div>
-  </section>
-
-  <section data-panel="predict">
-    <div class="card">
-      <h2>Stat projection <span class="sub">weighted recency + opp adjustment</span></h2>
-      <div class="row">
-        <input id="pred-id" placeholder="player name" style="flex:1;min-width:220px">
-        <select id="pred-stat">
-          <option>PTS</option><option>REB</option><option>AST</option>
-          <option>STL</option><option>BLK</option><option>TOV</option>
-          <option>PRA</option><option>PR</option><option>PA</option><option>RA</option>
-          <option>FG_PCT</option><option>FG3_PCT</option>
-        </select>
-        <select id="pred-range">
-          <option>L5</option><option>L10</option><option>L15</option>
-          <option>7-day</option><option>1-month</option><option>3-month</option>
-          <option selected>season</option><option>last_season</option>
-          <option>career</option>
-        </select>
-      </div>
-      <div class="row">
-        <label><input id="pred-garbage" type="checkbox"> exclude garbage time</label>
-        <label>min minutes <input id="pred-min" type="number" value="0" min="0" style="width:70px"></label>
-        <label>opp DRtg <input id="pred-opp" type="number" value="113" step="0.1" style="width:80px"></label>
-        <label>rest days <input id="pred-rest" type="number" value="1" min="0" style="width:60px"></label>
-      </div>
-      <canvas id="pred-chart" width="900" height="320"></canvas>
-      <div id="pred-summary"></div>
     </div>
   </section>
 
   <section data-panel="compare">
     <div class="card">
-      <h2>Player vs player</h2>
       <div class="row">
-        <input id="cmp-a" placeholder="player A name">
-        <input id="cmp-b" placeholder="player B name">
+        <input id="cmp-a" placeholder="player A — name">
+        <input id="cmp-b" placeholder="player B — name">
         <select id="cmp-stat">
           <option>PRA</option><option>PTS</option><option>REB</option><option>AST</option>
         </select>
         <button id="cmp-go" class="primary">Compare</button>
       </div>
-      <pre id="cmp-out" class="muted">…</pre>
-    </div>
-  </section>
-
-  <section data-panel="search">
-    <div class="card">
-      <h2>Search</h2>
-      <div class="row">
-        <input id="search-q" placeholder="who leads the NBA in assists per game?" style="flex:1;min-width:260px">
-        <button id="search-go" class="primary">Ask</button>
-      </div>
-      <div id="search-out"><div class="muted">try "lebron", "top scorers", or a question.</div></div>
-    </div>
-  </section>
-
-  <section data-panel="live">
-    <div class="card">
-      <h2>Live games</h2>
-      <div id="live-list"><div class="skeleton"></div></div>
+      <div id="cmp-out" class="muted" style="margin-top:12px">pick two players to compare side-by-side.</div>
     </div>
   </section>
 </main>
 
 <footer><span>NBA Intel · written in <a href="https://github.com/low4k/rock">Rock</a> · data from stats.nba.com + ESPN</span></footer>
-<script src="/static/app.v4.js?v=5"></script>
+<script src="/static/app.v4.js?v=6"></script>
 </body>
 </html>

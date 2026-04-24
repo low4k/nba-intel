@@ -1,3 +1,11 @@
+console.log('[nba-intel] app.v3.js loaded at', new Date().toISOString());
+try {
+  const dl = document.getElementById('dash-live');
+  const dldrs = document.getElementById('dash-leaders');
+  if (dl) dl.textContent = 'booting...';
+  if (dldrs) dldrs.textContent = 'booting...';
+} catch (_) {}
+
 const tabs = document.querySelectorAll('nav button');
 const panels = document.querySelectorAll('section[data-panel]');
 
@@ -267,8 +275,9 @@ async function refreshPinned() {
   });
 })();
 
-refreshLive();
-refreshLeaders();
-refreshPinned();
-setInterval(refreshLive, 8000);
-setInterval(refreshLeaders, 60000);
+// Kick off dashboard refreshes immediately — wrapped so later errors can't stop these.
+try { refreshLive(); } catch (e) { console.error('refreshLive failed', e); }
+try { refreshLeaders(); } catch (e) { console.error('refreshLeaders failed', e); }
+try { refreshPinned(); } catch (e) { console.error('refreshPinned failed', e); }
+setInterval(() => { try { refreshLive(); } catch (_) {} }, 8000);
+setInterval(() => { try { refreshLeaders(); } catch (_) {} }, 60000);

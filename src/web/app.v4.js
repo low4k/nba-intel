@@ -42,15 +42,42 @@ themeBtn.addEventListener('click', () => {
   themeBtn.textContent = next === 'dark' ? 'light' : 'dark';
 });
 
-async function api(path) {
+// Fix UTF-8 bytes that got re-encoded through Latin-1 ("Luka DonÄ\x8diÄ\x87" → "Luka Dončić").
+// Safe no-op on strings that already contain valid extended chars from a different source.
+function fixMojibake(s) {
+  if (typeof s !== 'string' || s.length === 0) return s;
+  // Must contain at least one 0x80-0xFF char AND look like a UTF-8 leading byte sequence.
+  if (!/[\u00c2-\u00f4][\u0080-\u00bf]/.test(s)) return s;
+  try {
+    const bytes = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i) & 0xff;
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch { return s; }
+}
+function deepFix(v) {
+  if (typeof v === 'string') return fixMojibake(v);
+  if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) v[i] = deepFix(v[i]); return v; }
+  if (v && typeof v === 'object') { for (const k in v) v[k] = deepFix(v[k]); return v; }
+  return v;
+}
+
+// Lightweight in-memory cache for GETs; TTL 45s.
+const _apiCache = new Map();
+async function api(path, opts = {}) {
+  const ttl = opts.ttl ?? 45_000;
+  const now = Date.now();
+  const hit = _apiCache.get(path);
+  if (!opts.force && hit && now - hit.t < ttl) return hit.v;
   const r = await fetch(path, { headers: { accept: 'application/json' } });
   if (!r.ok) throw new Error(`${path} -> ${r.status}`);
-  return await r.json();
+  const v = deepFix(await r.json());
+  _apiCache.set(path, { t: now, v });
+  return v;
 }
 const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({
   '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
 }[c]));
-const onImgFail = `this.style.visibility='hidden'`;
+const onImgFail = `this.onerror=null;this.src='/static/fallback-face.svg'`;
 
 // ---------- dashboard: leaders ----------
 const LEADER_CATEGORIES = [
@@ -72,7 +99,7 @@ function renderLeaderRows(rows) {
     const logo = r.team ? teamLogo(r.team) : '';
     const val = typeof r.value === 'number' ? r.value.toFixed(1) : (r.value ?? '—');
     return `
-      <div class="leader-row" data-player-id="${escHtml(r.id)}" style="--face:url('${face}'); --logo:url('${logo}')">
+      <div class="leader-row" data-player-id="${escHtml(r.id)}" data-player-name="${escHtml(r.name || '')}" style="--face:url('${face}'); --logo:url('${logo}')">
         <div class="rank ${i === 0 ? 'top1' : ''}">${i + 1}</div>
         <div class="face"></div>
         <div class="meta">
@@ -102,7 +129,7 @@ function renderLeaders() {
   el.querySelectorAll('.leader-row').forEach(row => row.addEventListener('click', () => {
     const id = row.dataset.playerId;
     if (!id) return;
-    openPlayer(id);
+    openPlayer(id, row.dataset.playerName);
   }));
 }
 
@@ -237,7 +264,7 @@ async function refreshPinned() {
       refreshPinned();
     }));
     el.querySelectorAll('.leader-row[data-player-id]').forEach(row => row.addEventListener('click', () => {
-      openPlayer(row.dataset.playerId);
+      openPlayer(row.dataset.playerId, row.dataset.playerName);
     }));
   } catch {
     el.innerHTML = '<div class="muted">pinned unavailable</div>';
@@ -245,11 +272,14 @@ async function refreshPinned() {
 }
 
 // ---------- player tab ----------
-function openPlayer(id) {
+function openPlayer(id, name) {
   if (!id) return;
   document.querySelector('nav button[data-tab="player"]').click();
   const inp = document.getElementById('player-id');
-  if (inp) inp.value = id;
+  if (inp) {
+    inp.value = name || id;        // show the NAME, not the numeric id
+    inp.dataset.playerId = id;     // but remember the id for future fetches
+  }
   loadPlayer(id);
 }
 
@@ -452,6 +482,8 @@ async function loadPlayer(id) {
           garbage: pGb.checked ? 'exclude' : 'include',
         });
         const d = await api(`/api/predict/${encodeURIComponent(id)}?${params}`);
+        // Attach the player's game log so the chart can show a popup on click.
+        if (!d.games) d.games = p.game_log || [];
         drawProjection(d, 'proj-chart');
         pChips.innerHTML = renderProjectionChips(d, pStat.value);
       } catch (e) {
@@ -586,11 +618,11 @@ async function loadTeam(id) {
           `<div class="stat-box"><div class="lbl">${lbl}</div><div class="val">${typeof v === 'number' ? v.toFixed(1) : v}</div></div>`
         ).join('')}</div>` : '';
     const roster = (t.roster || []).map(pl => `
-      <div class="roster-card" data-player-id="${escHtml(pl.id)}" style="--face:url('${pl.headshot || headshot(pl.id)}')">
-        <div class="face"></div>
+      <div class="roster-card" data-player-id="${escHtml(pl.id)}" data-player-name="${escHtml(pl.name || '')}">
+        <img class="face" src="${pl.headshot || headshot(pl.id)}" onerror="${onImgFail}" loading="lazy">
         <div class="info">
           <div class="nm">${escHtml(pl.name)}</div>
-          <div class="meta">${escHtml(pl.position || '')} ${pl.jersey ? '· #'+escHtml(pl.jersey) : ''}</div>
+          <div class="meta">${escHtml(pl.position || '')}${pl.jersey ? ' · #'+escHtml(pl.jersey) : ''}${pl.height ? ' · '+escHtml(pl.height) : ''}</div>
         </div>
       </div>`).join('');
     out.innerHTML = `
@@ -609,7 +641,7 @@ async function loadTeam(id) {
         ? `<div style="margin-top:10px"><span class="chip">sources: ${t.sources_used.map(escHtml).join(', ')}</span></div>` : ''}
     `;
     out.querySelectorAll('.roster-card').forEach(rc => rc.addEventListener('click', () => {
-      openPlayer(rc.dataset.playerId);
+      openPlayer(rc.dataset.playerId, rc.dataset.playerName);
     }));
   } catch (e) {
     out.innerHTML = `<div class="muted">could not load team ${escHtml(id)}: ${escHtml(e.message)}</div>`;
@@ -619,6 +651,9 @@ async function loadTeam(id) {
 document.getElementById('team-grid'); // presence check only
 
 // ---------- projection chart ----------
+// Map of canvas-id -> array of { x,y, game, value } for hit-testing clicks.
+const _chartHits = new Map();
+
 function drawProjection(data, canvasId = 'proj-chart') {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
@@ -708,10 +743,14 @@ function drawProjection(data, canvasId = 'proj-chart') {
   }
 
   // data points
+  const hits = [];
+  const games = data.games || data.log || [];
   series.forEach((v, i) => {
     const x = padL + xstep * (i + 1), y = yfor(v);
     ctx.fillStyle = accent2; ctx.beginPath(); ctx.arc(x, y, 3.2*dpr, 0, Math.PI * 2); ctx.fill();
+    hits.push({ x, y, v, i, game: games[i] || null });
   });
+  _chartHits.set(canvasId, { hits, dpr });
 
   // next game projected point
   if (data.next_game_point != null) {
@@ -730,16 +769,113 @@ function drawProjection(data, canvasId = 'proj-chart') {
     ctx.strokeStyle = bad; ctx.lineWidth = 1.6*dpr;
     ctx.beginPath(); ctx.arc(x, y, 8*dpr, 0, Math.PI * 2); ctx.stroke();
   });
+
+  // Wire up click + hover once per canvas
+  if (!canvas._hitWired) {
+    canvas._hitWired = true;
+    canvas.style.cursor = 'crosshair';
+    const findHit = (ev) => {
+      const rec = _chartHits.get(canvas.id);
+      if (!rec) return null;
+      const rect = canvas.getBoundingClientRect();
+      const px = (ev.clientX - rect.left) * (canvas.width  / rect.width);
+      const py = (ev.clientY - rect.top)  * (canvas.height / rect.height);
+      let best = null, bestD = Infinity;
+      for (const h of rec.hits) {
+        const d = (h.x - px) ** 2 + (h.y - py) ** 2;
+        if (d < bestD) { bestD = d; best = h; }
+      }
+      const maxR = 18 * rec.dpr;
+      return best && bestD <= maxR * maxR ? best : null;
+    };
+    const statLabel = () => {
+      const sel = document.getElementById('proj-stat');
+      const opt = sel && sel.options[sel.selectedIndex];
+      return opt ? opt.textContent.trim() : 'value';
+    };
+    canvas.addEventListener('mousemove', (ev) => {
+      canvas.style.cursor = findHit(ev) ? 'pointer' : 'crosshair';
+    });
+    canvas.addEventListener('click', (ev) => {
+      const hit = findHit(ev);
+      const pop = document.getElementById('chart-pop');
+      if (!hit) { if (pop) pop.classList.remove('show'); return; }
+      const g = hit.game || {};
+      let pop2 = pop;
+      if (!pop2) {
+        pop2 = document.createElement('div');
+        pop2.id = 'chart-pop';
+        pop2.className = 'chart-pop';
+        document.body.appendChild(pop2);
+      }
+      const when = g.date || g.game_date || '';
+      const opp = g.opp || g.opponent || g.matchup || '';
+      const res = g.result || (g.win === true ? 'W' : g.win === false ? 'L' : '');
+      const line = [
+        g.min != null ? g.min + ' MIN' : null,
+        g.pts != null ? g.pts + ' PTS' : null,
+        g.reb != null ? g.reb + ' REB' : null,
+        g.ast != null ? g.ast + ' AST' : null,
+        g.stl != null ? g.stl + ' STL' : null,
+        g.blk != null ? g.blk + ' BLK' : null,
+        g.to  != null ? g.to  + ' TO'  : null,
+        g.fgm != null && g.fga != null ? `FG ${g.fgm}/${g.fga}` : null,
+        g.fg3m != null && g.fg3a != null ? `3P ${g.fg3m}/${g.fg3a}` : null,
+        g.ftm != null && g.fta != null ? `FT ${g.ftm}/${g.fta}` : null,
+      ].filter(Boolean).join(' · ');
+      pop2.innerHTML = `
+        <div class="chart-pop-head">
+          <span class="chart-pop-when">${escHtml(when)}</span>
+          ${opp ? `<span class="chart-pop-opp">${escHtml(opp)}</span>` : ''}
+          ${res ? `<span class="chart-pop-res ${res.startsWith('W')?'win':res.startsWith('L')?'loss':''}">${escHtml(res)}</span>` : ''}
+        </div>
+        <div class="chart-pop-value"><b>${hit.v.toFixed(1)}</b> <span class="muted">${escHtml(statLabel())}</span></div>
+        <div class="chart-pop-line">${escHtml(line) || '<span class="muted">no box score available</span>'}</div>`;
+      pop2.style.left = (ev.clientX + 14) + 'px';
+      pop2.style.top  = (ev.clientY + 14) + 'px';
+      pop2.classList.add('show');
+    });
+    document.addEventListener('click', (ev) => {
+      if (ev.target === canvas) return;
+      const pop = document.getElementById('chart-pop');
+      if (pop) pop.classList.remove('show');
+    });
+  }
 }
 
 // ---------- compare ----------
+// Resolve whatever's in the input to a player id. Prefer the id stashed by the
+// autocomplete picker; if the user just typed a name and hit Compare, fall
+// back to /api/search and take the top hit.
+async function resolvePlayerId(inputEl) {
+  const raw = (inputEl.value || '').trim();
+  if (!raw) return null;
+  if (inputEl.dataset.playerId && (inputEl.dataset.lastResolveText === raw)) {
+    return { id: inputEl.dataset.playerId, name: raw };
+  }
+  if (/^\d+$/.test(raw)) return { id: raw, name: raw };
+  try {
+    const d = await api('/api/search?q=' + encodeURIComponent(raw));
+    const hit = (d.players || d.results || [])[0];
+    if (hit) {
+      const id = hit.id || hit.player_id;
+      inputEl.dataset.playerId = id;
+      inputEl.dataset.lastResolveText = raw;
+      return { id, name: hit.name || raw };
+    }
+  } catch {}
+  return null;
+}
+
 document.getElementById('cmp-go').addEventListener('click', async () => {
-  const a = document.getElementById('cmp-a').value.trim();
-  const b = document.getElementById('cmp-b').value.trim();
+  const aEl = document.getElementById('cmp-a');
+  const bEl = document.getElementById('cmp-b');
   const stat = document.getElementById('cmp-stat').value;
-  if (!a || !b) return;
   const out = document.getElementById('cmp-out');
   out.innerHTML = '<div class="skeleton" style="height:80px"></div>';
+  const [ra, rb] = await Promise.all([resolvePlayerId(aEl), resolvePlayerId(bEl)]);
+  if (!ra || !rb) { out.innerHTML = '<div class="muted">pick two players — start typing a name and choose from the dropdown.</div>'; return; }
+  const a = ra.id, b = rb.id;
   try {
     const [pa, pb] = await Promise.all([
       api('/api/players/' + encodeURIComponent(a)).catch(() => null),
@@ -825,8 +961,7 @@ function attachNameSearch(inputEl, onPick) {
       row.addEventListener('mousedown', (e) => {
         e.preventDefault();
         const id = row.dataset.id;
-        inputEl.value = row.dataset.name || id;
-        hide();
+        inputEl.value = row.dataset.name || id;        inputEl.dataset.playerId = id;        hide();
         if (onPick) onPick(id, row.dataset.name);
       });
     });

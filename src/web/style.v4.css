@@ -608,3 +608,187 @@ canvas#proj-chart {
 .cmp-table td.win {
   color: var(--accent); font-weight:700;
 }
+
+/* ========================================================================
+   v7 · basketball theme polish + chart popup + face fallback
+   ======================================================================== */
+
+/* court-line watermark for body */
+body::before {
+  content: "";
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    repeating-linear-gradient( 90deg, transparent 0 119px, rgba(255,107,26,.025) 119px 120px),
+    radial-gradient(circle at 50% 100%, rgba(255,107,26,.04) 0 120px, transparent 160px);
+  mask-image: linear-gradient(180deg, transparent, black 30%, black 70%, transparent);
+}
+header, main { position: relative; z-index: 1; }
+
+/* stronger header brand with basketball icon */
+header h1::before {
+  content: "";
+  width: 30px; height: 30px; border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 35%, #ff9a4d 0%, #c2410c 70%, #7c1d03 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,.4),
+    0 0 0 1px rgba(255,107,26,.4),
+    0 6px 16px -4px rgba(255,107,26,.55);
+  position: relative;
+}
+header h1 {
+  font-weight: 800; letter-spacing: .5px; font-size: 18px;
+  text-transform: uppercase;
+}
+header h1::after {
+  content: "";
+  display: inline-block; width: 30px; height: 30px; margin-left: -40px;
+  background-image:
+    radial-gradient(circle at 50% 50%, transparent 13px, #1a1210 13px 14px, transparent 14px),
+    linear-gradient(90deg, transparent 49%, #1a1210 49% 51%, transparent 51%),
+    radial-gradient(circle at 50% 10%, #1a1210 0 1px, transparent 2px);
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+/* nav gets tiny icons via data-tab */
+nav button[data-tab]::before {
+  display: inline-block; width: 14px; height: 14px;
+  margin-right: 6px; vertical-align: -2px;
+  background: currentColor;
+  mask-size: contain; mask-repeat: no-repeat; mask-position: center;
+  -webkit-mask-size: contain; -webkit-mask-repeat: no-repeat; -webkit-mask-position: center;
+  content: "";
+}
+nav button[data-tab="dashboard"]::before {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='3' y='3' width='8' height='8' rx='1.5'/><rect x='13' y='3' width='8' height='5' rx='1.5'/><rect x='3' y='13' width='8' height='8' rx='1.5'/><rect x='13' y='10' width='8' height='11' rx='1.5'/></svg>");
+          mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='3' y='3' width='8' height='8' rx='1.5'/><rect x='13' y='3' width='8' height='5' rx='1.5'/><rect x='3' y='13' width='8' height='8' rx='1.5'/><rect x='13' y='10' width='8' height='11' rx='1.5'/></svg>");
+}
+nav button[data-tab="player"]::before {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4'/><path d='M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8'/></svg>");
+          mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><circle cx='12' cy='8' r='4'/><path d='M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8'/></svg>");
+}
+nav button[data-tab="team"]::before {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 2l8 3v6c0 5-3.5 9.2-8 11-4.5-1.8-8-6-8-11V5l8-3z' fill='black'/></svg>");
+          mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 2l8 3v6c0 5-3.5 9.2-8 11-4.5-1.8-8-6-8-11V5l8-3z' fill='black'/></svg>");
+}
+nav button[data-tab="compare"]::before {
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 3v18M5 8h4l-2 6-2-6zm14 0h-4l2 6 2-6z' stroke='black' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+          mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 3v18M5 8h4l-2 6-2-6zm14 0h-4l2 6 2-6z' stroke='black' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+}
+
+/* face fallback: silhouette underneath. div version stacks; img uses onerror. */
+.leader-row .face,
+.roster-card .face,
+.search-row .face,
+.player-header .avatar,
+.cmp-head .avatar {
+  background-image: var(--face, none), url('/static/fallback-face.svg');
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  background-color: var(--bg-2);
+}
+img.face {
+  object-fit: cover;
+  background: var(--bg-2) center/cover no-repeat;
+  background-image: url('/static/fallback-face.svg');
+}
+
+/* accent stat-box with basketball glow ring */
+.stat-box.accent {
+  background: linear-gradient(180deg, rgba(255,107,26,.08), rgba(255,107,26,.02));
+  border-color: rgba(255,107,26,.35);
+  box-shadow: 0 0 0 1px rgba(255,107,26,.1), 0 4px 14px -8px rgba(255,107,26,.35);
+}
+.stat-box.accent .val { color: var(--accent); }
+
+/* chart click popup */
+.chart-pop {
+  position: fixed; z-index: 40; pointer-events: none;
+  min-width: 210px; max-width: 300px;
+  padding: 10px 12px;
+  background: #0f141bee;
+  border: 1px solid rgba(255,107,26,.5);
+  border-radius: 10px;
+  box-shadow: 0 14px 40px -12px rgba(0,0,0,.7), 0 0 0 1px rgba(255,107,26,.15);
+  color: var(--text); font-size: 12px;
+  opacity: 0; transform: translateY(6px);
+  transition: opacity .12s, transform .12s;
+  backdrop-filter: blur(6px);
+}
+.chart-pop.show { opacity: 1; transform: none; }
+.chart-pop-head {
+  display: flex; gap: 8px; align-items: center;
+  font-size: 11px; color: var(--muted); margin-bottom: 4px;
+}
+.chart-pop-head .chart-pop-opp { color: var(--text); font-weight: 600; }
+.chart-pop-head .chart-pop-res {
+  margin-left: auto; font-weight: 800;
+  padding: 1px 7px; border-radius: 4px; font-size: 10px;
+  background: var(--panel-2); color: var(--muted);
+}
+.chart-pop-head .chart-pop-res.win  { background: rgba(63,185,80,.18);  color: var(--good); }
+.chart-pop-head .chart-pop-res.loss { background: rgba(248,81,73,.18);   color: var(--bad); }
+.chart-pop-value { font-size: 22px; font-weight: 800; margin: 3px 0; }
+.chart-pop-value .muted { font-size: 11px; font-weight: 500; margin-left: 4px; }
+.chart-pop-line { color: var(--muted); line-height: 1.45; font-variant-numeric: tabular-nums; }
+
+/* section headers get a basketball bullet */
+.card h2::before {
+  content: "";
+  display: inline-block; width: 14px; height: 14px;
+  margin-right: 4px; vertical-align: -2px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 35%, #ff9a4d 0%, #c2410c 75%);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.35);
+}
+
+/* hex-ish stat pills row */
+.highs-row .high {
+  position: relative; overflow: hidden;
+}
+.highs-row .high::after {
+  content: ""; position: absolute; right: -14px; bottom: -14px;
+  width: 52px; height: 52px; border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 35%, #ff9a4d 0%, #c2410c 75%);
+  opacity: .12;
+}
+
+/* team ratings tiles */
+.tm-ratings {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px; margin: 10px 0 14px;
+}
+.tm-rating {
+  border: 1px solid var(--border); background: var(--panel-2);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+  position: relative; overflow: hidden;
+}
+.tm-rating .lbl { font-size: 10px; letter-spacing: .8px; color: var(--muted); text-transform: uppercase; }
+.tm-rating .val { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.tm-rating .rk  { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.tm-rating.good { border-color: rgba(63,185,80,.35); }
+.tm-rating.good .val { color: var(--good); }
+.tm-rating.bad  { border-color: rgba(248,81,73,.35); }
+.tm-rating.bad  .val { color: var(--bad); }
+
+/* team leaders strip */
+.tm-leaders {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px; margin-bottom: 14px;
+}
+.tm-leader {
+  display: grid; grid-template-columns: 44px 1fr auto; gap: 10px;
+  padding: 8px 10px; border: 1px solid var(--border); background: var(--panel-2);
+  border-radius: var(--radius-sm); align-items: center; cursor: pointer;
+  transition: border-color .12s, transform .12s;
+}
+.tm-leader:hover { border-color: var(--accent); transform: translateY(-1px); }
+.tm-leader .face { width: 44px; height: 32px; border-radius: 6px; background: var(--bg-2) center/cover no-repeat; background-image: var(--face, none), url('/static/fallback-face.svg'); box-shadow: inset 0 0 0 1px var(--border); }
+.tm-leader .nm { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tm-leader .rle { font-size: 10px; color: var(--muted); letter-spacing: .6px; text-transform: uppercase; }
+.tm-leader .stat { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); }
+.tm-leader .stat small { display: block; font-size: 10px; color: var(--muted); text-align: right; font-weight: 500; }

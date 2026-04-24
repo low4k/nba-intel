@@ -8,7 +8,6 @@ fn default_config() {
     {
         "host": host_val,
         "port": port_val,
-        "data_dir": "./data",
         "web_dir": "./src/web",
         "cache_ttl_seconds": 300,
         "live_poll_seconds": 5,

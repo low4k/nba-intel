@@ -1,5 +1,6 @@
 import "db.rk" as db
 import "sources/espn.rk" as espn
+import "sources/nba_official.rk" as nba
 
 fn empty_team() {
     {
@@ -34,8 +35,8 @@ fn get(store, team_id) {
     t["season"] = parts["year"]
 
     t = teams.enrich_from_espn(t, parts["abbr"])
+    t = teams.enrich_from_nba_official(t, parts["abbr"], parts["year"])
 
-    db.save_snapshot(store, "team", team_id, t)
     db.cache_put(store, key, t)
     t
 }
@@ -87,5 +88,23 @@ fn record_source(team, name) {
         if s == name { return team }
     }
     push(team["sources_used"], name)
+    team
+}
+
+fn enrich_from_nba_official(team, abbr, year) {
+    try {
+        let season = nba.current_season()
+        let map = nba.team_ratings(season)
+        let r = map[team["name"]] ?? map[abbr] ?? nil
+        if r != nil {
+            team["ratings"]["off_rating"] = r["off_rating"] ?? team["ratings"]["off_rating"]
+            team["ratings"]["def_rating"] = r["def_rating"] ?? team["ratings"]["def_rating"]
+            team["ratings"]["net_rating"] = r["net_rating"] ?? team["ratings"]["net_rating"]
+            team["ratings"]["pace"]       = r["pace"]       ?? team["ratings"]["pace"]
+            teams.record_source(team, "nba_official")
+        }
+    } catch (e) {
+        log.warn(`teams: nba_official enrich failed: ${e}`)
+    }
     team
 }

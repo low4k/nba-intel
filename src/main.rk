@@ -13,12 +13,10 @@ import "server.rk" as server
 
 fn main() {
     let config = cfg.default_config()
-    fs.mkdir(config["data_dir"])
-    let store = db.new_store(config["data_dir"])
+    let store = db.new_store(nil)
     let live_state = live.live_state()
 
-    log.info("nba-intel starting")
-    log.info(`data dir: ${config["data_dir"]}`)
+    log.info("nba-intel starting (stateless; no on-disk persistence)")
     log.info(`web dir:  ${config["web_dir"]}`)
 
     server.serve(config, store, live_state)

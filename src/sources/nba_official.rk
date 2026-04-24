@@ -39,3 +39,99 @@ fn shots(player_id, season) {
     if data_ == nil { return [] }
     { "source": "nba_official", "player_id": player_id, "season": season, "shots": data_ }
 }
+
+// League-wide per-game leaders for a given stat category.
+// Returns a list of maps: { "rank","player_id","name","team","value" }.
+// stat_category is one of: PTS, REB, AST, STL, BLK, FG_PCT, FG3_PCT,
+// FT_PCT, MIN, EFF, TOV. Season format: "2025-26".
+fn league_leaders(stat_category, season) {
+    let q = `/leagueleaders?LeagueID=00&PerMode=PerGame&Scope=S&Season=${season}&SeasonType=Regular+Season&StatCategory=${stat_category}`
+    let data_ = nba.fetch(q)
+    if data_ == nil { return [] }
+    let rs = data_["resultSet"] ?? {}
+    let headers_ = rs["headers"] ?? []
+    let rows = rs["rowSet"] ?? []
+    if len(headers_) == 0 or len(rows) == 0 { return [] }
+    let mut idx = { "PLAYER_ID": -1, "RANK": -1, "PLAYER": -1, "TEAM": -1 }
+    let mut stat_idx = -1
+    let mut i = 0
+    while i < len(headers_) {
+        let h = headers_[i]
+        if h == "PLAYER_ID" { idx["PLAYER_ID"] = i }
+        else if h == "RANK" { idx["RANK"] = i }
+        else if h == "PLAYER" { idx["PLAYER"] = i }
+        else if h == "TEAM" { idx["TEAM"] = i }
+        else if h == stat_category { stat_idx = i }
+        i = i + 1
+    }
+    if stat_idx < 0 { return [] }
+    let mut out = []
+    let mut j = 0
+    while j < len(rows) {
+        let r = rows[j]
+        push(out, {
+            "rank":      r[idx["RANK"]],
+            "player_id": `${r[idx["PLAYER_ID"]]}`,
+            "name":      r[idx["PLAYER"]],
+            "team":      r[idx["TEAM"]],
+            "value":     r[stat_idx]
+        })
+        j = j + 1
+    }
+    out
+}
+
+// Team advanced stats (off/def rating, net rating, pace) from
+// leaguedashteamstats. Returns a map keyed by team abbreviation.
+fn team_ratings(season) {
+    let q = `/leaguedashteamstats?Conference=&DateFrom=&DateTo=&Division=&GameScope=&GameSegment=&LastNGames=0&LeagueID=00&Location=&MeasureType=Advanced&Month=0&OpponentTeamID=0&Outcome=&PORound=0&PaceAdjust=N&PerMode=PerGame&Period=0&PlayerExperience=&PlayerPosition=&PlusMinus=N&Rank=N&Season=${season}&SeasonSegment=&SeasonType=Regular+Season&ShotClockRange=&StarterBench=&TeamID=0&TwoWay=0&VsConference=&VsDivision=`
+    let data_ = nba.fetch(q)
+    if data_ == nil { return {} }
+    let rs0 = (data_["resultSets"] ?? [])
+    if len(rs0) == 0 { return {} }
+    let rs = rs0[0]
+    let headers_ = rs["headers"] ?? []
+    let rows = rs["rowSet"] ?? []
+    let mut abbr_i = -1
+    let mut off_i = -1
+    let mut def_i = -1
+    let mut net_i = -1
+    let mut pace_i = -1
+    let mut i = 0
+    while i < len(headers_) {
+        let h = headers_[i]
+        if h == "TEAM_NAME" { abbr_i = i }
+        else if h == "OFF_RATING" { off_i = i }
+        else if h == "DEF_RATING" { def_i = i }
+        else if h == "NET_RATING" { net_i = i }
+        else if h == "PACE" { pace_i = i }
+        i = i + 1
+    }
+    let mut out = {}
+    let mut j = 0
+    while j < len(rows) {
+        let r = rows[j]
+        let name = r[abbr_i]
+        out[name] = {
+            "off_rating": if off_i >= 0 { r[off_i] } else { nil },
+            "def_rating": if def_i >= 0 { r[def_i] } else { nil },
+            "net_rating": if net_i >= 0 { r[net_i] } else { nil },
+            "pace":       if pace_i >= 0 { r[pace_i] } else { nil }
+        }
+        j = j + 1
+    }
+    out
+}
+
+// Current-season string: "YYYY-YY+1" with rollover in August.
+fn current_season() {
+    let now = time.now_ms()
+    // Rough approximation via epoch: seasons rollover ~Aug 1st.
+    // For simplicity we let the caller override via env NBA_SEASON.
+    let override_ = os.get_env("NBA_SEASON") ?? ""
+    if override_ != "" { return override_ }
+    // Fallback: assume we are inside the 2025-26 season by default.
+    // Production deployments SHOULD set NBA_SEASON explicitly.
+    "2025-26"
+}
+

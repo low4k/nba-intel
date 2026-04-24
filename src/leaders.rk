@@ -1,79 +1,30 @@
-import "players.rk" as players
+import "sources/nba_official.rk" as nba
+import "db.rk" as db
 
-fn star_ids() {
-    [
-        "1966",    // LeBron James
-        "3112335", // Nikola Jokic
-        "3032977", // Giannis Antetokounmpo
-        "3945274", // Luka Doncic
-        "4278073", // Shai Gilgeous-Alexander
-        "4065648", // Jayson Tatum
-        "3975",    // Stephen Curry
-        "4594268", // Anthony Edwards
-        "5104157", // Victor Wembanyama
-        "4396993", // Tyrese Haliburton
-        "3202"     // Kevin Durant
-    ]
-}
-
-fn stat_value(p, stat) {
-    let t = p["traditional"] ?? {}
-    if stat == "PTS" { return t["pts"] ?? 0 }
-    if stat == "REB" { return t["reb"] ?? 0 }
-    if stat == "AST" { return t["ast"] ?? 0 }
-    if stat == "STL" { return t["stl"] ?? 0 }
-    if stat == "BLK" { return t["blk"] ?? 0 }
-    0
-}
+// Pulls real league-wide leaders from stats.nba.com. No hardcoded
+// player list, no on-disk storage — just fetch, parse, cache in RAM
+// for 60 s (leaderboards barely change intra-game).
 
 fn top_for(store, stat, limit) {
-    let ids = leaders.star_ids()
-    let mut rows = []
-    for id in ids {
-        try {
-            let p = players.get(store, id)
-            if p == nil { continue }
-            if (p["name"] ?? "") == "" { continue }
-            push(rows, {
-                "id":   p["id"] ?? id,
-                "name": p["name"] ?? "",
-                "team": p["team"] ?? "",
-                "value": leaders.stat_value(p, stat)
-            })
-        } catch (e) {
-            log.warn(`leaders: player ${id}: ${e}`)
-        }
-    }
-    leaders.sort_desc_by_value(rows)
-    if len(rows) > limit { rows = leaders.take(rows, limit) }
-    rows
-}
+    let season = nba.current_season()
+    let key = `leaders:${stat}:${season}:${limit}`
+    let cached = db.cache_get(store, key, 60_000)
+    if cached != nil { return cached }
 
-fn sort_desc_by_value(rows) {
-    let n = len(rows)
-    let mut i = 0
-    while i < n {
-        let mut j = i + 1
-        while j < n {
-            if (rows[j])["value"] > (rows[i])["value"] {
-                let tmp = rows[i]
-                rows[i] = rows[j]
-                rows[j] = tmp
-            }
-            j = j + 1
-        }
-        i = i + 1
-    }
-    rows
-}
-
-fn take(arr, n) {
+    let rows = nba.league_leaders(stat, season)
     let mut out = []
     let mut i = 0
-    while i < n and i < len(arr) {
-        push(out, arr[i])
+    while i < len(rows) and i < limit {
+        let r = rows[i]
+        push(out, {
+            "id":    r["player_id"],
+            "name":  r["name"],
+            "team":  r["team"],
+            "value": r["value"]
+        })
         i = i + 1
     }
+    db.cache_put(store, key, out)
     out
 }
 
@@ -81,6 +32,8 @@ fn summary(store) {
     {
         "pts": leaders.top_for(store, "PTS", 5),
         "reb": leaders.top_for(store, "REB", 5),
-        "ast": leaders.top_for(store, "AST", 5)
+        "ast": leaders.top_for(store, "AST", 5),
+        "stl": leaders.top_for(store, "STL", 5),
+        "blk": leaders.top_for(store, "BLK", 5)
     }
 }

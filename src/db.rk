@@ -1,7 +1,6 @@
 
-fn new_store(data_dir) {
+fn new_store(_unused) {
     {
-        "data_dir": data_dir,
         "cache": {},
         "cache_at": {},
         "subscribers": []
@@ -31,28 +30,6 @@ fn cache_invalidate(store, key) {
     store["cache_at"][key] = nil
 }
 
-fn snapshot_path(store, kind, id) {
-    `${store["data_dir"]}/${kind}_${id}.json`
-}
-
-fn save_snapshot(store, kind, id, value) {
-    let p = db.snapshot_path(store, kind, id)
-    try {
-        fs.write(p, json.stringify(value))
-    } catch (e) {
-        log.warn(`could not save snapshot ${p}: ${e}`)
-    }
-    value
-}
-
-fn load_snapshot(store, kind, id) {
-    let p = db.snapshot_path(store, kind, id)
-    if not fs.exists(p) { return nil }
-    try {
-        let data_ = fs.read(p)
-        return json.parse(data_)
-    } catch (e) {
-        log.warn(`could not load snapshot ${p}: ${e}`)
-        return nil
-    }
-}
+// Persistence deliberately removed. nba-intel is stateless: every
+// request recomputes from upstream (ESPN, stats.nba.com, etc.) with
+// only an in-memory TTL cache (above) to smooth rate limits.

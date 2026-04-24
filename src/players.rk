@@ -14,7 +14,6 @@ fn get(store, player_id) {
     p = players.enrich_from_espn_overview(p, player_id)
     p = players.enrich_from_espn_gamelog(p, player_id)
 
-    db.save_snapshot(store, "player", player_id, p)
     db.cache_put(store, cache_key, p)
     p
 }

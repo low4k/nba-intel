@@ -2,11 +2,14 @@
 console.log('[nba-intel] app.v4.js loaded', new Date().toISOString());
 
 // ---------- CDN helpers ----------
-const headshot = (id, size = 'small') => {
-  // NBA CDN serves 1040x760 (large) and 260x190 (small).
-  const s = size === 'large' ? '1040x760' : '260x190';
-  return `https://cdn.nba.com/headshots/nba/latest/${s}/${id}.png`;
+// We use ESPN player IDs throughout the app, so we pull faces from ESPN's CDN.
+// ESPN serves a single high-res PNG per player at this path; it resizes fine in CSS.
+const headshot = (id /*, size */) => {
+  if (!id) return '';
+  return `https://a.espncdn.com/i/headshots/nba/players/full/${id}.png`;
 };
+// A player record from our API may carry a `headshot` URL — always prefer it.
+const faceOf = (p) => (p && p.headshot) ? p.headshot : headshot(p && p.id);
 const teamLogo = (abbr) => {
   if (!abbr) return '';
   // ESPN's logo CDN covers every NBA team by lowercase abbr.
@@ -255,7 +258,7 @@ async function loadPlayer(id) {
   out.innerHTML = '<div class="skeleton" style="height:100px"></div>';
   try {
     const p = await api('/api/players/' + encodeURIComponent(id));
-    const face = headshot(id, 'large');
+    const face = faceOf({ id, ...p });
     const logo = teamLogo(p.team);
     const t = p.traditional || {};
     const stats = [
@@ -270,23 +273,65 @@ async function loadPlayer(id) {
         : v;
       return `<div class="stat-box"><div class="lbl">${lbl}</div><div class="val">${display}</div></div>`;
     }).join('');
+
+    // --- bio grid: EVERYTHING we know about this player ---
+    const bioFields = [
+      ['Team',       p.team_name || p.team],
+      ['Position',   p.position_full || p.position],
+      ['Jersey',     p.jersey ? '#' + p.jersey : ''],
+      ['Height',     p.height_display],
+      ['Weight',     p.weight_display],
+      ['Wingspan',   p.wingspan_display],
+      ['Age',        p.age > 0 ? p.age : ''],
+      ['Born',       p.dob],
+      ['Birthplace', p.birthplace],
+      ['College',    p.college],
+      ['Draft',      p.draft],
+      ['Debut',      p.debut_year > 0 ? p.debut_year : ''],
+      ['Experience', p.experience],
+      ['Status',     p.status],
+    ].filter(([,v]) => v != null && v !== '' && v !== 0);
+    const bioHtml = bioFields.length
+      ? `<div class="bio-grid">${bioFields.map(([k, v]) =>
+          `<div class="bio-row"><span class="k">${k}</span><span class="v">${escHtml(v)}</span></div>`
+        ).join('')}</div>`
+      : '';
+
     const pinned = pinnedIds().includes(String(id));
+    const shortSub = [p.team, p.position, p.jersey ? '#' + p.jersey : '', p.height_display, p.weight_display]
+      .filter(x => x).join(' · ');
+
+    // --- inline mini-projection: pick a stat, show band ---
+    const miniPred = `
+      <div class="mini-pred">
+        <div class="mini-pred-head">
+          <span>Next-game projection</span>
+          <select id="mini-pred-stat">
+            <option>PTS</option><option>REB</option><option>AST</option>
+            <option>PRA</option><option>PR</option><option>PA</option><option>RA</option>
+            <option>STL</option><option>BLK</option>
+          </select>
+          <button class="ghost" id="mini-pred-open">open full predictor →</button>
+        </div>
+        <div id="mini-pred-body"><div class="muted">loading…</div></div>
+      </div>`;
+
     out.innerHTML = `
       <div class="player-header" style="--face:url('${face}'); --logo:url('${logo}')">
         <div class="avatar"></div>
         <div class="title">
-          <div class="name">${escHtml(p.name || ('Player ' + id))}</div>
+          <div class="name">${escHtml(p.full_name || p.name || ('Player ' + id))}</div>
           <div class="sub">
             <span class="logo"></span>
-            <span>${escHtml(p.team || '')}</span>
-            ${p.position ? `<span>· ${escHtml(p.position)}</span>` : ''}
-            ${p.jersey ? `<span>· #${escHtml(p.jersey)}</span>` : ''}
-            ${p.experience ? `<span>· ${escHtml(p.experience)} yr</span>` : ''}
+            <span>${escHtml(shortSub)}</span>
           </div>
         </div>
         <button class="pin-btn ${pinned ? '' : 'primary'}" id="pin-toggle">${pinned ? 'unpin' : 'pin'}</button>
       </div>
+      ${bioHtml}
+      <h3 class="section-h">SEASON AVERAGES</h3>
       <div class="stat-grid">${statGrid || '<div class="muted">no season stats yet</div>'}</div>
+      ${miniPred}
       ${renderGameLog(p.game_log || [])}
       ${(p.sources_used && p.sources_used.length)
         ? `<div style="margin-top:10px" class="muted"><span class="chip">sources: ${p.sources_used.map(escHtml).join(', ')}</span></div>` : ''}
@@ -299,9 +344,72 @@ async function loadPlayer(id) {
       loadPlayer(id);
       refreshPinned();
     });
+    // wire up mini predictor
+    const miniSel = document.getElementById('mini-pred-stat');
+    const miniBody = document.getElementById('mini-pred-body');
+    const runMini = async () => {
+      miniBody.innerHTML = '<div class="muted">projecting…</div>';
+      try {
+        const d = await api(`/api/predict/${encodeURIComponent(id)}?stat=${miniSel.value}&garbage=exclude`);
+        miniBody.innerHTML = renderProjectionChips(d, miniSel.value);
+      } catch (e) {
+        miniBody.innerHTML = `<div class="muted">not enough game log to project</div>`;
+      }
+    };
+    miniSel.addEventListener('change', runMini);
+    document.getElementById('mini-pred-open').addEventListener('click', () => {
+      document.querySelector('nav button[data-tab="predict"]').click();
+      const inp = document.getElementById('pred-id'); if (inp) inp.value = id;
+      document.getElementById('pred-stat').value = miniSel.value;
+      const go = document.getElementById('pred-go'); if (go) go.click();
+    });
+    runMini();
   } catch (e) {
     out.innerHTML = `<div class="muted">could not load player ${escHtml(id)}: ${escHtml(e.message)}</div>`;
   }
+}
+
+// ------- projection chips (shared by mini predictor + main predict tab) -------
+function renderProjectionChips(d, statLabel) {
+  if (!d || !d.samples) return '<div class="muted">no data</div>';
+  const pt   = d.next_game_point;
+  const low  = d.next_game_low;
+  const high = d.next_game_high;
+  const mean = d.mean;
+  const sd   = d.stddev;
+  const series = d.series || [];
+  const l10 = series.slice(-10);
+  const l5  = series.slice(-5);
+  const avg = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : 0;
+  const l10Avg = avg(l10), l5Avg = avg(l5);
+  const trend = (l5Avg - l10Avg).toFixed(1);
+  const trendArrow = l5Avg > l10Avg + 0.1 ? '▲' : (l5Avg < l10Avg - 0.1 ? '▼' : '→');
+  // hit-rate over a common threshold
+  const threshold = pt ? Math.round(pt - 0.5) : Math.round(mean || 0);
+  const overs = l10.filter(v => v >= threshold + 0.5).length;
+  return `
+    <div class="pred-chips">
+      <div class="chip-card big">
+        <div class="lbl">projected ${statLabel}</div>
+        <div class="val">${pt != null ? pt.toFixed(1) : '—'}</div>
+        <div class="range">${low != null ? low.toFixed(1) : '—'} – ${high != null ? high.toFixed(1) : '—'}</div>
+      </div>
+      <div class="chip-card">
+        <div class="lbl">L5 / L10</div>
+        <div class="val">${l5Avg.toFixed(1)} / ${l10Avg.toFixed(1)}</div>
+        <div class="range ${l5Avg > l10Avg ? 'up' : (l5Avg < l10Avg ? 'down' : '')}">${trendArrow} ${trend >= 0 ? '+' : ''}${trend}</div>
+      </div>
+      <div class="chip-card">
+        <div class="lbl">season mean</div>
+        <div class="val">${mean.toFixed(1)}</div>
+        <div class="range">σ ${sd.toFixed(2)}</div>
+      </div>
+      <div class="chip-card">
+        <div class="lbl">over ${threshold + 0.5}</div>
+        <div class="val">${overs}/${l10.length}</div>
+        <div class="range">L10 hit rate</div>
+      </div>
+    </div>`;
 }
 
 function renderGameLog(games) {
@@ -435,15 +543,7 @@ predBtn.addEventListener('click', async () => {
     const data = await api(`/api/predict/${encodeURIComponent(id)}?${params}`);
     drawProjection(data);
     const sum = document.getElementById('pred-summary');
-    sum.innerHTML = `
-      <div class="stat-grid" style="margin-top:12px">
-        <div class="stat-box"><div class="lbl">samples</div><div class="val">${data.samples}</div></div>
-        <div class="stat-box"><div class="lbl">mean</div><div class="val">${data.mean.toFixed(2)}</div></div>
-        <div class="stat-box"><div class="lbl">sd</div><div class="val">${data.stddev.toFixed(2)}</div></div>
-        <div class="stat-box"><div class="lbl">next</div><div class="val">${data.next_game_point ? data.next_game_point.toFixed(1) : '—'}</div></div>
-        <div class="stat-box"><div class="lbl">low</div><div class="val">${data.next_game_low ? data.next_game_low.toFixed(1) : '—'}</div></div>
-        <div class="stat-box"><div class="lbl">high</div><div class="val">${data.next_game_high ? data.next_game_high.toFixed(1) : '—'}</div></div>
-      </div>`;
+    sum.innerHTML = renderProjectionChips(data, document.getElementById('pred-stat').value);
   } catch (e) {
     document.getElementById('pred-summary').innerHTML = `<div class="muted">could not project: ${escHtml(e.message)}</div>`;
   }
@@ -569,6 +669,81 @@ document.getElementById('search-go').addEventListener('click', doSearch);
 document.getElementById('search-q').addEventListener('keydown', e => {
   if (e.key === 'Enter') doSearch();
 });
+
+// ---------- name autocomplete ----------
+// Attach to any <input> so users can type a name and pick from a dropdown
+// without ever needing to know a player id.
+function attachNameSearch(inputEl, onPick) {
+  if (!inputEl || inputEl.dataset.nameSearchWired === '1') return;
+  inputEl.dataset.nameSearchWired = '1';
+  inputEl.setAttribute('autocomplete', 'off');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'namesearch-wrap';
+  inputEl.parentNode.insertBefore(wrap, inputEl);
+  wrap.appendChild(inputEl);
+  const dd = document.createElement('div');
+  dd.className = 'namesearch-dd';
+  dd.hidden = true;
+  wrap.appendChild(dd);
+
+  let timer = null;
+  let lastQ = '';
+  const hide = () => { dd.hidden = true; dd.innerHTML = ''; };
+  const render = (hits) => {
+    if (!hits || !hits.length) { hide(); return; }
+    dd.innerHTML = hits.slice(0, 8).map(h => {
+      const id = h.id || h.player_id;
+      return `
+        <div class="ns-row" data-id="${escHtml(id)}" data-name="${escHtml(h.name || h.displayName || '')}">
+          <img class="ns-face" src="${headshot(id)}" loading="lazy" onerror="this.style.visibility='hidden'">
+          <div class="ns-meta">
+            <div class="ns-name">${escHtml(h.name || h.displayName || id)}</div>
+            <div class="ns-sub">${escHtml(h.team || '')}${h.position ? ' · ' + escHtml(h.position) : ''}</div>
+          </div>
+        </div>`;
+    }).join('');
+    dd.hidden = false;
+    dd.querySelectorAll('.ns-row').forEach(row => {
+      row.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const id = row.dataset.id;
+        inputEl.value = row.dataset.name || id;
+        hide();
+        if (onPick) onPick(id, row.dataset.name);
+      });
+    });
+  };
+  const search = async (q) => {
+    if (q === lastQ) return;
+    lastQ = q;
+    if (q.length < 2) { hide(); return; }
+    try {
+      const data = await api('/api/search?q=' + encodeURIComponent(q));
+      const hits = data.players || data.results || [];
+      render(hits);
+    } catch { hide(); }
+  };
+  inputEl.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => search(inputEl.value.trim()), 180);
+  });
+  inputEl.addEventListener('focus', () => {
+    if (lastQ && inputEl.value.trim() === lastQ) dd.hidden = false;
+  });
+  inputEl.addEventListener('blur', () => setTimeout(hide, 120));
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') hide();
+  });
+}
+
+// wire name search on the player + predict inputs (they'll load as soon as you pick)
+attachNameSearch(document.getElementById('player-id'), (id) => loadPlayer(id));
+attachNameSearch(document.getElementById('pred-id'),   (id) => {
+  const go = document.getElementById('pred-go'); if (go) go.click();
+});
+attachNameSearch(document.getElementById('cmp-a'), () => {});
+attachNameSearch(document.getElementById('cmp-b'), () => {});
 
 // ---------- boot ----------
 refreshLeaders();

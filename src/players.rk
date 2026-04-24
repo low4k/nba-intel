@@ -24,19 +24,51 @@ fn enrich_from_espn_overview(player, player_id) {
     norm.record_source(player, "espn")
     let ath = o["athlete"] ?? {}
     player["name"] = ath["displayName"] ?? player["name"]
+    player["first_name"] = ath["firstName"] ?? ""
+    player["last_name"]  = ath["lastName"]  ?? ""
     let pos_v = ath["position"]
-    if type_of(pos_v) == "map" { player["position"] = pos_v["abbreviation"] ?? player["position"] }
-    else if type_of(pos_v) == "str" { player["position"] = pos_v }
+    if type_of(pos_v) == "map" {
+        player["position"] = pos_v["abbreviation"] ?? player["position"]
+        player["position_full"] = pos_v["displayName"] ?? pos_v["name"] ?? ""
+    } else if type_of(pos_v) == "str" {
+        player["position"] = pos_v
+    }
     let team_v = ath["team"]
-    if type_of(team_v) == "map" { player["team"] = team_v["abbreviation"] ?? player["team"] }
-    else if type_of(team_v) == "str" { player["team"] = team_v }
+    if type_of(team_v) == "map" {
+        player["team"] = team_v["abbreviation"] ?? player["team"]
+        player["team_name"] = team_v["displayName"] ?? team_v["name"] ?? ""
+    } else if type_of(team_v) == "str" { player["team"] = team_v }
     let hs_v = ath["headshot"]
     if type_of(hs_v) == "map" { player["headshot"] = hs_v["href"] ?? "" }
     else if type_of(hs_v) == "str" { player["headshot"] = hs_v }
-    player["jersey"] = ath["jersey"] ?? ""
+    // ESPN consistently serves full-size headshots at this URL too:
+    if player["headshot"] == "" {
+        player["headshot"] = `https://a.espncdn.com/i/headshots/nba/players/full/${player_id}.png`
+    }
+    player["jersey"] = ath["jersey"] ?? ath["displayJersey"] ?? ""
     let exp_v = ath["experience"]
-    if type_of(exp_v) == "map" { player["experience"] = exp_v["years"] ?? 0 }
-    else if type_of(exp_v) == "int" or type_of(exp_v) == "float" { player["experience"] = exp_v }
+    if type_of(exp_v) == "map" { player["experience"] = str(exp_v["years"] ?? "") }
+    else if type_of(exp_v) == "int" or type_of(exp_v) == "float" { player["experience"] = str(exp_v) }
+    if player["experience"] == "" or player["experience"] == "0" {
+        player["experience"] = ath["displayExperience"] ?? player["experience"]
+    }
+    player["age"]             = ath["age"] ?? 0
+    player["height_display"]  = ath["displayHeight"] ?? ""
+    player["weight_display"]  = ath["displayWeight"] ?? ""
+    player["dob"]             = ath["displayDOB"] ?? ath["dateOfBirth"] ?? ""
+    player["birthplace"]      = ath["displayBirthPlace"] ?? ""
+    player["debut_year"]      = ath["debutYear"] ?? 0
+    let stat_v = ath["status"]
+    if type_of(stat_v) == "map" { player["status"] = stat_v["name"] ?? stat_v["type"] ?? "" }
+    else if type_of(stat_v) == "str" { player["status"] = stat_v }
+    player["draft"]           = ath["displayDraft"] ?? ""
+    // Bio endpoint fills in college, full bio lines, contract, etc.
+    let bio = espn.player_bio(player_id)
+    if bio != nil and type_of(bio) == "map" {
+        let a2 = bio["athlete"] ?? bio
+        player["college"] = (a2["college"] ?? {})["name"] ?? player["college"] ?? ""
+        if type_of(a2["college"]) == "str" { player["college"] = a2["college"] }
+    }
     player = players.enrich_from_espn_stats(player, player_id)
     player
 }

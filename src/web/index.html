@@ -6,7 +6,7 @@
 <title>NBA Intel</title>
 <link rel="preconnect" href="https://cdn.nba.com" crossorigin>
 <link rel="preconnect" href="https://a.espncdn.com" crossorigin>
-<link rel="stylesheet" href="/static/style.v4.css">
+<link rel="stylesheet" href="/static/style.v4.css?v=5">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -48,13 +48,13 @@
     <div class="card">
       <h2>Player profile</h2>
       <div class="row">
-        <input id="player-id" placeholder="player id (e.g. 2544 = LeBron)" style="flex:1;min-width:220px">
+        <input id="player-id" placeholder="type a player name — e.g. LeBron, SGA, Luka" style="flex:1;min-width:260px">
         <button id="player-load" class="primary">Load</button>
       </div>
       <div class="muted" style="font-size:12px;margin-bottom:10px">
-        tip: use the Search tab to find ids by name, or click any leader/roster card anywhere on the site.
+        start typing a name and pick from the dropdown — or click any leader / roster card anywhere.
       </div>
-      <div id="player-out"><div class="muted">enter a player id and hit Load</div></div>
+      <div id="player-out"><div class="muted">type a player name above to see everything we know about them.</div></div>
     </div>
   </section>
 
@@ -74,7 +74,7 @@
     <div class="card">
       <h2>Stat projection <span class="sub">weighted recency + opp adjustment</span></h2>
       <div class="row">
-        <input id="pred-id" placeholder="player id" style="flex:1;min-width:180px">
+        <input id="pred-id" placeholder="player name" style="flex:1;min-width:220px">
         <select id="pred-stat">
           <option>PTS</option><option>REB</option><option>AST</option>
           <option>STL</option><option>BLK</option><option>TOV</option>
@@ -103,8 +103,8 @@
     <div class="card">
       <h2>Player vs player</h2>
       <div class="row">
-        <input id="cmp-a" placeholder="player A id">
-        <input id="cmp-b" placeholder="player B id">
+        <input id="cmp-a" placeholder="player A name">
+        <input id="cmp-b" placeholder="player B name">
         <select id="cmp-stat">
           <option>PRA</option><option>PTS</option><option>REB</option><option>AST</option>
         </select>
@@ -134,6 +134,6 @@
 </main>
 
 <footer><span>NBA Intel · written in <a href="https://github.com/low4k/rock">Rock</a> · data from stats.nba.com + ESPN</span></footer>
-<script src="/static/app.v4.js"></script>
+<script src="/static/app.v4.js?v=5"></script>
 </body>
 </html>

@@ -83,7 +83,7 @@ pub fn decode_hex(hh) {
 
 pub fn write_response(conn, status, body, content_type) {
     let status_text = http_util.status_phrase(status)
-    let head = `HTTP/1.1 ${status} ${status_text}\r\nContent-Type: ${content_type}\r\nContent-Length: ${len(body)}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n`
+    let head = `HTTP/1.1 ${status} ${status_text}\r\nContent-Type: ${content_type}\r\nContent-Length: ${len(body)}\r\nCache-Control: no-cache, no-store, must-revalidate\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n`
     net.write(conn, head + body)
 }
 

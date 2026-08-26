@@ -78,9 +78,9 @@ predBtn.addEventListener('click', async () => {
   drawProjection(data);
   document.getElementById('pred-summary').innerHTML =
     `samples=${data.samples} mean=${data.mean.toFixed(2)} sd=${data.stddev.toFixed(2)} ` +
-    `next=${data.next_game_point ? data.next_game_point.toFixed(2) : '—'} ` +
-    `band=[${data.next_game_low ? data.next_game_low.toFixed(2) : '—'}, ` +
-    `${data.next_game_high ? data.next_game_high.toFixed(2) : '—'}] ` +
+    `next=${data.next_game_point ? data.next_game_point.toFixed(2) : ' - '} ` +
+    `band=[${data.next_game_low ? data.next_game_low.toFixed(2) : ' - '}, ` +
+    `${data.next_game_high ? data.next_game_high.toFixed(2) : ' - '}] ` +
     `anomalies=${data.anomalies.length}`;
 });
 
@@ -172,9 +172,9 @@ async function refreshLive() {
       ? '<div style="color:var(--muted)">no games right now</div>'
       : games.map(g => {
           const wp = typeof g.win_probability_home === 'number'
-            ? `${(g.win_probability_home * 100).toFixed(1)}%` : '—';
+            ? `${(g.win_probability_home * 100).toFixed(1)}%` : ' - ';
           const pace = typeof g.pace_estimate === 'number'
-            ? g.pace_estimate.toFixed(1) : '—';
+            ? g.pace_estimate.toFixed(1) : ' - ';
           return `
           <div style="border:1px solid var(--border); border-radius:8px; padding:10px; margin:6px 0">
             <strong>${g.away.team} ${g.away.score} @ ${g.home.team} ${g.home.score}</strong>
@@ -192,7 +192,7 @@ async function refreshLive() {
 }
 
 function renderLeaderList(rows) {
-  if (!rows || rows.length === 0) return '<div style="color:var(--muted)">—</div>';
+  if (!rows || rows.length === 0) return '<div style="color:var(--muted)"> - </div>';
   return rows.map(r => `
     <div style="display:flex; justify-content:space-between; gap:8px; padding:2px 0">
       <span>${r.name || r.id}${r.team ? ` <span style="color:var(--muted)">${r.team}</span>` : ''}</span>
@@ -275,7 +275,7 @@ async function refreshPinned() {
   });
 })();
 
-// Kick off dashboard refreshes immediately — wrapped so later errors can't stop these.
+// Kick off dashboard refreshes immediately - wrapped so later errors can't stop these.
 try { refreshLive(); } catch (e) { console.error('refreshLive failed', e); }
 try { refreshLeaders(); } catch (e) { console.error('refreshLeaders failed', e); }
 try { refreshPinned(); } catch (e) { console.error('refreshPinned failed', e); }

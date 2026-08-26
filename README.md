@@ -57,7 +57,7 @@ HTTPS is handled by the Rock interpreter shelling out to `curl` (3s connect /
 
 ```
    src/
-   ├── main.rk            entry point — wires everything and starts the server
+   ├── main.rk            entry point - wires everything and starts the server
    ├── config.rk          tunables: ports, cache TTLs, source URLs
    ├── log.rk             tiny structured logger
    ├── db.rk              persistent JSON store + in-memory cache
@@ -96,7 +96,7 @@ HTTPS is handled by the Rock interpreter shelling out to `curl` (3s connect /
 
 Because the language has a real stdlib (http, net, json, fs, time, regex,
 strs, math), structured concurrency (`spawn` + `await` + channels), pattern
-matching, and pipelines — it turns out to be a natural fit for a data-pipeline
+matching, and pipelines - it turns out to be a natural fit for a data-pipeline
 + live-server style workload.
 
 ## License

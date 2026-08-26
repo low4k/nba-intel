@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=rockbuild /build/rockc/target/release/rock /usr/local/bin/rock
 
 WORKDIR /app
-# Only the runtime assets — skip vendor/, data snapshots, etc.
+# Only the runtime assets - skip vendor/, data snapshots, etc.
 COPY src /app/src
 COPY rock.toml /app/rock.toml
 RUN mkdir -p /app/data

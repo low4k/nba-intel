@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh — build the vendored rock interpreter if needed, then run the site.
+# run.sh - build the vendored rock interpreter if needed, then run the site.
 set -euo pipefail
 
 cd "$(dirname "$0")"

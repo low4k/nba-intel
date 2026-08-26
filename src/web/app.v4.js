@@ -1,4 +1,4 @@
-// NBA Intel dashboard v4 — headshots, team logos, richer cards.
+// NBA Intel dashboard v4 - headshots, team logos, richer cards.
 console.log('[nba-intel] app.v4.js loaded', new Date().toISOString());
 
 // ---------- CDN helpers ----------
@@ -8,7 +8,7 @@ const headshot = (id /*, size */) => {
   if (!id) return '';
   return `https://a.espncdn.com/i/headshots/nba/players/full/${id}.png`;
 };
-// A player record from our API may carry a `headshot` URL — always prefer it.
+// A player record from our API may carry a `headshot` URL - always prefer it.
 const faceOf = (p) => (p && p.headshot) ? p.headshot : headshot(p && p.id);
 const teamLogo = (abbr) => {
   if (!abbr) return '';
@@ -97,7 +97,7 @@ function renderLeaderRows(rows) {
   return '<div class="leaders-list">' + rows.map((r, i) => {
     const face = r.id ? headshot(r.id) : '';
     const logo = r.team ? teamLogo(r.team) : '';
-    const val = typeof r.value === 'number' ? r.value.toFixed(1) : (r.value ?? '—');
+    const val = typeof r.value === 'number' ? r.value.toFixed(1) : (r.value ?? ' - ');
     return `
       <div class="leader-row" data-player-id="${escHtml(r.id)}" data-player-name="${escHtml(r.name || '')}" style="--face:url('${face}'); --logo:url('${logo}')">
         <div class="rank ${i === 0 ? 'top1' : ''}">${i + 1}</div>
@@ -154,7 +154,7 @@ function renderLiveGames(games) {
     const homeLead = homeScore > awayScore;
     const awayLead = awayScore > homeScore;
     const wp = typeof g.win_probability_home === 'number' ? g.win_probability_home : null;
-    const pace = typeof g.pace_estimate === 'number' ? g.pace_estimate.toFixed(1) : '—';
+    const pace = typeof g.pace_estimate === 'number' ? g.pace_estimate.toFixed(1) : ' - ';
     const st = (g.status || '').toLowerCase();
     const pillClass = st.includes('final') ? 'final' : st.includes('scheduled') ? 'scheduled' : '';
     const statusLine = st.includes('final')
@@ -187,7 +187,7 @@ function renderLiveGames(games) {
         </div>
         ${wpBar}
         <div class="footer">
-          <span>win prob (home): <b>${wp != null ? (wp*100).toFixed(1) + '%' : '—'}</b></span>
+          <span>win prob (home): <b>${wp != null ? (wp*100).toFixed(1) + '%' : ' - '}</b></span>
           <span>pace est: <b>${pace}</b></span>
         </div>
       </div>`;
@@ -472,7 +472,7 @@ async function loadPlayer(id) {
     const pGb = document.getElementById('proj-garbage');
     const pChips = document.getElementById('proj-chips');
     const runProj = async () => {
-      pChips.innerHTML = '<div class="muted" style="margin-top:10px">projecting…</div>';
+      pChips.innerHTML = '<div class="muted" style="margin-top:10px">projecting...</div>';
       try {
         const params = new URLSearchParams({
           stat:   pStat.value,
@@ -511,7 +511,7 @@ function renderProjectionChips(d, statLabel) {
   const avg = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : 0;
   const l10Avg = avg(l10), l5Avg = avg(l5);
   const trend = (l5Avg - l10Avg);
-  const trendArrow = l5Avg > l10Avg + 0.1 ? '▲' : (l5Avg < l10Avg - 0.1 ? '▼' : '→');
+  const trendArrow = l5Avg > l10Avg + 0.1 ? '▲' : (l5Avg < l10Avg - 0.1 ? '▼' : '->');
   const threshold = pt ? Math.round(pt - 0.5) : Math.round(mean || 0);
   const overs = l10.filter(v => v >= threshold + 0.5).length;
   const ceiling = Math.max(...series);
@@ -520,8 +520,8 @@ function renderProjectionChips(d, statLabel) {
     <div class="pred-chips">
       <div class="chip-card big">
         <div class="lbl">projected ${statLabel}</div>
-        <div class="val">${pt != null ? pt.toFixed(1) : '—'}</div>
-        <div class="range">${low != null ? low.toFixed(1) : '—'} – ${high != null ? high.toFixed(1) : '—'}</div>
+        <div class="val">${pt != null ? pt.toFixed(1) : ' - '}</div>
+        <div class="range">${low != null ? low.toFixed(1) : ' - '} - ${high != null ? high.toFixed(1) : ' - '}</div>
       </div>
       <div class="chip-card">
         <div class="lbl">L5 / L10</div>
@@ -540,7 +540,7 @@ function renderProjectionChips(d, statLabel) {
       </div>
       <div class="chip-card">
         <div class="lbl">floor · ceiling</div>
-        <div class="val">${isFinite(floor) ? floor : '—'} · ${isFinite(ceiling) ? ceiling : '—'}</div>
+        <div class="val">${isFinite(floor) ? floor : ' - '} · ${isFinite(ceiling) ? ceiling : ' - '}</div>
         <div class="range">season range</div>
       </div>
     </div>`;
@@ -554,9 +554,9 @@ function renderGameLog(games, n = 10) {
       <td>${g.venue === 'away' ? '@' : 'vs'} ${escHtml(g.opponent || '')}</td>
       <td class="${g.result === 'W' ? 'good' : g.result === 'L' ? 'bad' : ''}">${escHtml(g.result || '')} ${escHtml(g.score || '')}</td>
       <td style="font-variant-numeric:tabular-nums">${(g.minutes||0).toFixed(0)}</td>
-      <td style="font-variant-numeric:tabular-nums"><b>${g.pts ?? '—'}</b></td>
-      <td style="font-variant-numeric:tabular-nums">${g.reb ?? '—'}</td>
-      <td style="font-variant-numeric:tabular-nums">${g.ast ?? '—'}</td>
+      <td style="font-variant-numeric:tabular-nums"><b>${g.pts ?? ' - '}</b></td>
+      <td style="font-variant-numeric:tabular-nums">${g.reb ?? ' - '}</td>
+      <td style="font-variant-numeric:tabular-nums">${g.ast ?? ' - '}</td>
       <td style="font-variant-numeric:tabular-nums">${g.stl ?? 0}/${g.blk ?? 0}/${g.tov ?? 0}</td>
       <td style="font-variant-numeric:tabular-nums">${g.fgm ?? ''}-${g.fga ?? ''}</td>
       <td style="font-variant-numeric:tabular-nums">${g.fg3m ?? ''}-${g.fg3a ?? ''}</td>
@@ -970,7 +970,7 @@ document.getElementById('cmp-go').addEventListener('click', async () => {
   const out = document.getElementById('cmp-out');
   out.innerHTML = '<div class="skeleton" style="height:80px"></div>';
   const [ra, rb] = await Promise.all([resolvePlayerId(aEl), resolvePlayerId(bEl)]);
-  if (!ra || !rb) { out.innerHTML = '<div class="muted">pick two players — start typing a name and choose from the dropdown.</div>'; return; }
+  if (!ra || !rb) { out.innerHTML = '<div class="muted">pick two players - start typing a name and choose from the dropdown.</div>'; return; }
   const a = ra.id, b = rb.id;
   try {
     const [pa, pb] = await Promise.all([
@@ -980,8 +980,8 @@ document.getElementById('cmp-go').addEventListener('click', async () => {
     if (!pa || !pb) { out.innerHTML = '<div class="muted">could not load one or both players</div>'; return; }
     const tA = pa.traditional || {}, tB = pb.traditional || {};
     const row = (lbl, av, bv, fmt = v => v.toFixed(1)) => {
-      const a2 = typeof av === 'number' ? fmt(av) : (av ?? '—');
-      const b2 = typeof bv === 'number' ? fmt(bv) : (bv ?? '—');
+      const a2 = typeof av === 'number' ? fmt(av) : (av ?? ' - ');
+      const b2 = typeof bv === 'number' ? fmt(bv) : (bv ?? ' - ');
       const lean = (typeof av === 'number' && typeof bv === 'number') ? (av > bv ? 'a' : av < bv ? 'b' : '') : '';
       return `<tr>
         <td class="${lean === 'a' ? 'win' : ''}">${a2}</td>

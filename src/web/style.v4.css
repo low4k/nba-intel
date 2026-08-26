@@ -609,7 +609,6 @@ canvas#proj-chart {
   color: var(--accent); font-weight:700;
 }
 
-/* ========================================================================
    v7 · basketball theme polish + chart popup + face fallback
    ======================================================================== */
 
@@ -793,7 +792,7 @@ img.face {
 .tm-leader .stat { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); }
 .tm-leader .stat small { display: block; font-size: 10px; color: var(--muted); text-align: right; font-weight: 500; }
 
-/* ---------- v8 team page — splits / recent / upcoming / best-worst ---------- */
+/* ---------- v8 team page - splits / recent / upcoming / best-worst ---------- */
 .tm-sec-h { font-size: 11px; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; margin: 14px 0 6px; font-weight: 700; }
 
 .tm-splits { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }

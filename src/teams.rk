@@ -30,7 +30,7 @@ fn empty_team() {
 
 fn get(store, team_id) {
     let key = `team:${team_id}`
-    // Teams barely change intra-day — 30 min is safe and cuts ESPN load.
+    // Teams barely change intra-day - 30 min is safe and cuts ESPN load.
     let cached = db.cache_get(store, key, 1_800_000)
     if cached != nil { return cached }
 
@@ -227,7 +227,7 @@ fn enrich_schedule(team, abbr) {
         push(recent, finished[r_i])
         r_i = r_i - 1
     }
-    // Upcoming — cap to next 5.
+    // Upcoming - cap to next 5.
     let mut up5 = []
     let mut u = 0
     while u < len(upcoming) and u < 5 {

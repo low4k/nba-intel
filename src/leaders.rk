@@ -2,7 +2,7 @@ import "sources/nba_official.rk" as nba
 import "db.rk" as db
 
 // Pulls real league-wide leaders from stats.nba.com. No hardcoded
-// player list, no on-disk storage — just fetch, parse, cache in RAM
+// player list, no on-disk storage - just fetch, parse, cache in RAM
 // for 60 s (leaderboards barely change intra-game).
 
 fn top_for(store, stat, limit) {
